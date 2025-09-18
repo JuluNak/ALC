@@ -44,7 +44,7 @@ def normaMatMC(A, q, p, Np):
 
  
         normadex = norma(x, p)
-        if normadex != 0:
+        if normadex != 0: #POR LAS DUDAS
             for i in range(n):
                 x[i] = x[i] / normadex
 
