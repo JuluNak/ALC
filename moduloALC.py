@@ -158,7 +158,32 @@ def condMC(A, p, Np):
 def condExacta(A, p):
     return normaExacta(A, p)*normaExacta(np.linalg.inv(A), p)
 
-
+def descomplu(A):
+    n = A.shape[0]
+    L = np.zeros((n, n), dtype=float)
+    for i in range(n):
+        L[i, i] = 1.0 #lo define como uno, pues es lower
+    
+    U = A.copy()
+    
+    
+    ops = 0  #cont
+    
+    for i in range(n):
+        if U[i, i] == 0:  # pivote=0
+            return None
+        
+        for j in range(i+1, n):
+    
+            L[j,i] = U[j, i] / U[i, i]
+            ops += 1
+            
+          
+            for m in range(i, n):
+                U[j, m] = U[j, m] - L[j, i] * U[i, m]
+                ops += 2  
+    
+    return L, U, ops
 ## ----------------------------------------
 
 
@@ -428,3 +453,4 @@ D0 = np.diag([1,1,1])
 V0 = np.array([[1,0,0],[1,1,0],[1,1+1e-10,1]]).T
 A = L0 @ D0 @ V0
 assert(not esSDP(A))
+
