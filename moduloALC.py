@@ -184,6 +184,35 @@ def descomplu(A):
                 ops += 2  
     
     return L, U, ops
+
+
+
+def trigangularsupyinf(L, b, lower=True):
+
+
+  
+    L = np.array(L, dtype=float) #por las dudas
+
+    n= L.shape[0]
+    x = []
+    if lower:  # triangularizacion inferior 
+        for i in range(n):
+            h = 0.0
+            for j in range(i):
+                h += L[i, j] * x[j]
+            x.append((b[i] - h) / L[i, i])
+            
+            
+    else:  # triangularizacion superior 
+        for i in range(n-1, -1, -1):
+            h = 0.0
+         
+            for j in range(n-1, i, -1):
+                h += L[i, j] * x[n-1-j]
+            x.append((b[i] - h) / L[i, i])
+        x = x[::-1]  # invierto la lista
+
+    return x
 ## ----------------------------------------
 
 
@@ -453,4 +482,5 @@ D0 = np.diag([1,1,1])
 V0 = np.array([[1,0,0],[1,1,0],[1,1+1e-10,1]]).T
 A = L0 @ D0 @ V0
 assert(not esSDP(A))
+
 
