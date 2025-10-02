@@ -68,10 +68,7 @@ def afin(theta, s, b):
     return np.array(res)
 
 
-def traspuesta(A):
-    A = np.array(A)
-    return A.T
-    """
+def traspuesta(A):   
     filas = A.shape[0]
     columnas = A.shape[1]
     fil = 0
@@ -81,10 +78,10 @@ def traspuesta(A):
         vector = []
         for col in range(0, columnas):
             vector.append(A[col][fil])
+        vector = np.array(vector)
         res.append(vector)
     res = np.array(res)
-    """
-
+    return res
 
 
 def transafin(v, theta, s, b):
@@ -158,63 +155,127 @@ def condMC(A, p, Np):
 def condExacta(A, p):
     return normaExacta(A, p)*normaExacta(np.linalg.inv(A), p)
 
-def descomplu(A):
+
+### Funciones L05-QR
+def productoInterno(u,v,tol=1e-12):
+    res = 0
+    n = u.shape[0]
+    for fil in range(n):
+        res += u[fil]*v[fil]
+    return res
+
+def multiplicacionMatricial(A, B, tol=1e-12):
+    columnas_A = A.shape[1]
+    filas_A = A.shape[0]
+    filas_B = B.shape[0]
+    columnas_B = B.shape[1]
+    if columnas_A != filas_B:
+        return None
+    else:
+        res = []
+        for fil in range(filas_A):
+            vector = []
+            for col in range(columnas_B):        
+                vector.append(productoInterno(A[fil,:], B[:,col]))
+            res.append(vector)
+        res = np.array(res)
+        return res       
+
+def QR_con_GS(A,tol=1e-12,retorna_nops=False):
+    columnas = A.shape[1]
+    filas = A.shape[0]
+    if columnas != filas:
+        return None
+    else:
+        Q = []
+        q1 = A[0]/norma(A[0], 2)
+        qj = q1
+        Q.append(qj)
+        for j in range(1, columnas):
+            qj = A[j]
+            for k in range(0,j):
+                r = productoInterno(A[j], Q[k])
+                qj = qj - r*Q[k]
+            r = norma(qj, 2)
+            qj = qj/r
+            Q.append(qj)
+        Q = np.array(Q)
+        R = multiplicacionMatricial(traspuesta(Q), A)
+        return Q, R
+    
+
+def signo(a):
+    if a < 0:
+        return -1
+    else:
+        return 1
+    
+def productoExterno(u,v):
+    res = []
+    for i in range(len(u)):
+        vector = []
+        for j in range(len(v)):
+            vector.append(u[i]*v[j])
+        vector = np.array(vector)
+        res.append(vector)
+    res = np.array(res)
+    return res
+
+def QR_con_HH(A,tol=1e-12):
+    
     n = A.shape[0]
-    L = np.zeros((n, n), dtype=float)
-    for i in range(n):
-        L[i, i] = 1.0 #lo define como uno, pues es lower
+    m = A.shape[1]
+    if m < n:
+        return None
+    else:
+        R = A.copy()
+        Q = np.eye(m)
+        for k in range(n):
+            x = R[k:, k]
+            a = -signo(x[0])*norma(x,2)
+            u = x - a*(np.eye(x.shape[0])[0])
+            if norma(u, 2) > tol:
+                u = u/norma(u,2)
+                Hk = np.eye(len(u)) - 2*(productoExterno(u, u))
+                H = np.eye(m)
+                H[k:, k:] = Hk
+                R = multiplicacionMatricial(H, R)
+                Q = multiplicacionMatricial(Q, traspuesta(H))
+    return Q, R
+"""
+                Hk = np.eye(m-k+1) - 2*multiplicacionMatricial(u, traspuesta(u))
+                Hk2 = np.eye(k-1)
+                elementos = []
+                for i in range(Hk2.shape[1]):
+                    for j in range(Hk2.shape[1]):
+                        elementos.append(Hk2[i][j])
+                    for j in range(Hk2.shape[1],m):
+                        elementos.append(0)
+                for i in range(Hk.shape[1]):
+                    for j in range(Hk2.shape[1]):
+                        elementos.append(0)
+                    for j in range(Hk2.shape[1],m):
+                        elementos.append(Hk[i][j])
+                Hk2 = np.array(Hk2)
+                Hk2 = elementos.reshape(m,m)
+"""
+
+                    
+def calculaQR(A,metodo,tol=1e-12):
+    if metodo == 'RH':
+        return QR_con_HH(A)
+    elif metodo == 'GS':
+        return QR_con_GS(A)
+    else:
+        return None
+    """
+    A una matriz de n x n 
+    tol la tolerancia con la que se filtran elementos nulos en R    
+    metodo = ['RH','GS'] usa reflectores de Householder (RH) o Gram Schmidt (GS) para realizar la factorizacion
+    retorna matrices Q y R calculadas con Gram Schmidt (y como tercer argumento opcional, el numero de operaciones)
+    Si el metodo no esta entre las opciones, retorna None
+    """
     
-    U = A.copy()
-    
-    
-    ops = 0  #cont
-    
-    for i in range(n):
-        if U[i, i] == 0:  # pivote=0
-            return None
-        
-        for j in range(i+1, n):
-    
-            L[j,i] = U[j, i] / U[i, i]
-            ops += 1
-            
-          
-            for m in range(i, n):
-                U[j, m] = U[j, m] - L[j, i] * U[i, m]
-                ops += 2  
-    
-    return L, U, ops
-
-
-
-def trigangularsupyinf(L, b, lower=True):
-
-
-  
-    L = np.array(L, dtype=float) #por las dudas
-
-    n= L.shape[0]
-    x = []
-    if lower:  # triangularizacion inferior 
-        for i in range(n):
-            h = 0.0
-            for j in range(i):
-                h += L[i, j] * x[j]
-            x.append((b[i] - h) / L[i, i])
-            
-            
-    else:  # triangularizacion superior 
-        for i in range(n-1, -1, -1):
-            h = 0.0
-         
-            for j in range(n-1, i, -1):
-                h += L[i, j] * x[n-1-j]
-            x.append((b[i] - h) / L[i, i])
-        x = x[::-1]  # invierto la lista
-
-    return x
-## ----------------------------------------
-
 
 
     
@@ -373,7 +434,7 @@ assert(np.allclose(normaA*normaA_,condA))
 
 
 ## ------------------------------------------
-
+"""
 # Tests L04-LU
 
 # Tests LU
@@ -482,5 +543,57 @@ D0 = np.diag([1,1,1])
 V0 = np.array([[1,0,0],[1,1,0],[1,1+1e-10,1]]).T
 A = L0 @ D0 @ V0
 assert(not esSDP(A))
+"""
 
+# Tests L05-QR:
 
+import numpy as np
+
+# --- Matrices de prueba ---
+A2 = np.array([[1., 2.],
+               [3., 4.]])
+
+A3 = np.array([[1., 0., 1.],
+               [0., 1., 1.],
+               [1., 1., 0.]])
+
+A4 = np.array([[2., 0., 1., 3.],
+               [0., 1., 4., 1.],
+               [1., 0., 2., 0.],
+               [3., 1., 0., 2.]])
+
+# --- Funciones auxiliares para los tests ---
+def check_QR(Q,R,A,tol=1e-10):
+    # Comprueba ortogonalidad y reconstrucción
+    assert np.allclose(Q.T @ Q, np.eye(Q.shape[1]), atol=tol)
+    assert np.allclose(Q @ R, A, atol=tol)
+
+# --- TESTS PARA QR_by_GS2 ---
+Q2,R2 = QR_con_GS(A2)
+check_QR(Q2,R2,A2)
+
+Q3,R3 = QR_con_GS(A3)
+check_QR(Q3,R3,A3)
+
+Q4,R4 = QR_con_GS(A4)
+check_QR(Q4,R4,A4)
+
+# --- TESTS PARA QR_by_HH ---
+Q2h,R2h = QR_con_GS(A2)
+check_QR(Q2h,R2h,A2)
+
+Q3h,R3h = QR_con_HH(A3)
+check_QR(Q3h,R3h,A3)
+
+Q4h,R4h = QR_con_HH(A4)
+check_QR(Q4h,R4h,A4)
+
+# --- TESTS PARA calculaQR ---
+Q2c,R2c = calculaQR(A2,metodo='RH')
+check_QR(Q2c,R2c,A2)
+
+Q3c,R3c = calculaQR(A3,metodo='GS')
+check_QR(Q3c,R3c,A3)
+
+Q4c,R4c = calculaQR(A4,metodo='RH')
+check_QR(Q4c,R4c,A4)
