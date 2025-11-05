@@ -297,7 +297,70 @@ def calculaQR(A,metodo,tol=1e-12):
     Si el metodo no esta entre las opciones, retorna None
     """
     
+#LABORATORIO 7)
 
+#1
+#a) QUIERO GENERAR UNA MATRIZ CUYOS VALORES ESTEN ENTRE 0 Y 1 Y LA SUMA DE LAS COLUMNAS SEA 1
+
+def transiciones_al_azar_continuas(n):
+   
+   
+    T = np.random.rand(n, n)  
+    
+    for j in range(n):
+        colum=[]
+        for i in range(n):
+            colum.append(T[i][j])
+            
+        sumacolumna = sumacol(colum)
+        for i in range(n):
+            T[i, j] = T[i, j] / sumacolumna # dividir cada elemento por la suma
+
+    return T
+
+
+def sumacol(lista):
+    res=0
+    for x in lista:
+        res+=x
+    return res
+
+#b) QUIERO GENERAR UNA MATRIZ CON UN CIERTO "x", tal que los aij > x  --> aij=1 , aij < x --> aij=0 , esto para todo aij, ademas luego tengo q normalizar las filas
+
+
+
+
+def transicion_al_azar_uniforme(n, thres):
+ 
+    T = np.random.rand(n, n)
+    
+  
+    for i in range(n):
+         for j in range(n):
+             if T[i, j] < thres:
+                 T[i, j] = 1
+             else:
+                 T[i, j] = 0
+
+    
+    for j in range(n):
+        colum = []
+        for i in range(n):
+            colum.append(T[i][j])
+        sumacolumna = sumacol(colum)
+        
+     
+        
+        if sumacolumna == 0: #cASO SUMA DE COL ==0, CHEQUEAR ESTO
+            
+             for i in range(n): 
+                 T[i, j] = 1 / n
+        else:
+             for i in range(n):
+                 T[i, j] = T[i, j] / sumacolumna
+
+    return T
+    
 
     
 #---------------------------------
@@ -865,3 +928,4 @@ for k in [1,3,5]:
     assert hU.shape[1] == k, 'Dimensiones de hU incorrectas (caso a)'
     assert hV.shape[1] == k, 'Dimensiones de hV incorrectas(caso a)'
     assert len(hS) == k, 'Tamaño de hS incorrecto'
+
