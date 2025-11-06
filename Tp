@@ -3,6 +3,7 @@ import numpy as np
 #HAY 2 MANERAS PQ NO SE CUAL ES LA CORRECTA INTERPRETACION DE LA CONSIGNA
 # EN LA MANERA 1 ESTAN LOS 3 CASOS
 # EN LA MANERA 2 FALTA EL ULTIMO
+#SE PODRA USAR LA INVERSA O ME EXIGE MUCHA COMPLEJIDAD??
 def cholesky(A):
     n = len(A)
     L = np.zeros_like(A, dtype=float)
@@ -245,6 +246,7 @@ def pinvEcuacionesNormales(L, Y):
     
     if filas == columnas:
         #falta esto en esta version del ejercicio!!!
+        # TENDRE Q USAR LA INVERSA??
     
     
     
