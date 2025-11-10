@@ -260,7 +260,14 @@ def pinvEcuacionesNormales(L, Y):
 
         # ACA ABAJO HAY UNA IDEA SOBRE EL DE GRAM-SMITH Y HOUSEHOLDER:
         # PREGUNTAR Q ONDA!!!
+X=......(ALGUN ARRAY)
+Y=.......
+XT.X=multiplicar(XT,X)
+L=cholesky(XT.X)
+W=pinvEcuacionesNormales(L,Y)
 
+#ASI SERIA LA ESTRUCTURA ???
+    
 
 
         def intentoejer5(Q,R,Y): 
