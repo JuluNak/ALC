@@ -247,6 +247,85 @@ def pinvEcuacionesNormales(L, Y):
     if filas == columnas:
         #falta esto en esta version del ejercicio!!!
         # TENDRE Q USAR LA INVERSA??
+
+
+
+        # ACA ABAJO HAY UNA IDEA SOBRE EL DE GRAM-SMITH Y HOUSEHOLDER:
+        # PREGUNTAR Q ONDA!!!
+
+
+
+        def intentoejer5(Q,R,Y): 
+    #IDEAS: PLANTEEMOS LO Q NOS DICE EL ALGORITMO 3 , YO QUIERO HALLAR PRIMERO X+,LLAMEMOSLO "V",(ALL ESTO USANDO QUE (QR= XT))
+    #LUEGO V= Q.(RT)-1 
+    #AHORA MULTIPLICO AMBOS LADOS POR RT Y LLEGO A QUE V.RT=Q
+    #LUEGO TRASPONGO LA IGUALDAD PARA  Q ME QUEDE MAS COMODO Y PODER USAR LA FUNCION Q"RESOLVERTRIANGULAR)
+    #ME QUEDA QUE R.VT=QT
+    #FINALMENTE W=V.Y
+    #PARENTESIS R ES TRIANG SUP
+    #:)
+    #ACLARACION SOBRE CREACION DE MATRIZ VT , SOBRE SUS DIMENSIONES : VT TIENE Q TENER LA SIGUIENTE DIMENSION , R ES CUADRADA LUEGO R ES nxn Q ES RECTANGULAR)? DIRIA ASI 
+    #HAGAMOS Q ES DE pxn esto implicaria q QT es nxp y si yo estoy BUSCANDO LA DIMESION DE UNA MATRIZ TAL QUE VALGA R.VT=QT 
+    #nxn X ?? = nxp , SABEMOS Q LA CANT DE FILAS DE VT TIENE Q SER N PUES SINO NO VALDRIA LA MULTIPLICACION Y SI COMO RESULTANTE ME QUEDA UNA MATRIZ DE PXN 
+    #ENTONCES VT TIENE Q SER DE DIM NXP
+    #Y POR ESTO ME CREO LA MATRIZ VT CON LAS MISMAS DIM Q QT
+    
+    
+    QT = traspuesta(Q)
+    dimsQT=np.shape(QT)
+    n=dimsQT[0]
+    p=dimsQT[1]
+    VT = np.zeros((n, p))
+    
+    for i in range (p):
+        b=[]
+        for j in range(n):
+            b.append(QT[i][j])#ESTOS INDICEES VAN BIEN??
+        b=np.array(b)
+        soluc=resolverTriangular(R,b,"superior")
+        
+        for k in range(n):
+            VT[i][j]=soluc[k]#MISMO PARA ACA , ESTOS INDICES TAN BIEN??
+            
+        
+    V=traspuesta(VT)
+    
+    W=multiplicar(Y,V)
+    
+    return W
+    
+def pinvGramSchmidt(Q, R, Y):
+    
+    QT = traspuesta(Q)
+    dimsQT=np.shape(QT)
+    n=dimsQT[0]
+    p=dimsQT[1]
+    VT = np.zeros((n, p))
+    
+    for i in range (p):
+        b=[]
+        for j in range(n):
+            b.append(QT[i][j])
+        b=np.array(b)
+        soluc=resolverTriangular(R,b,"superior")
+        
+        for k in range(n):
+            VT[i][j]=soluc[i]
+            
+        
+    V=traspuesta(VT)
+    
+    W=multiplicar(Y,V)
+    
+    return W
+
+
+# COMO TENGO LA DUDA DE SI ESTA BIEN LA MANERA Q ESTOY TENIENDO DE IMPLEMENTAR EL TP , TENGO Q PREGUNTAR PQ LA MISMA SOLUC ME SIRVE PARA AMBOS CASOS!!!
+    
+    
+    
+    
+    
     
     
     
