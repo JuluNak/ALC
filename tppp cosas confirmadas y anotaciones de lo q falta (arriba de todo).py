@@ -172,6 +172,32 @@ def pinvEcuacionesNormales(X,Y,L):
         #Solo pasamos X al otro lado. Quedaria W = T.X^-1
         inv_X = inversa(X)
         return multiplicar(Y, inv_X)
+
+
+
+def espseudoinv(X,Xp,tol=1e-8):
+
+    matrizprimeracond=multiplicar(multiplicar(X,Xp),X)
+    matrizsegundacond=multiplicar(multiplicar(Xp,X),Xp)
+    matrizterceracond=traspuesta(multiplicar(X,Xp))
+    matrizcuartacond=traspuesta(multiplicar(Xp,X))
+    
+    
+    def tolerancia(y, z):
+        diferencia = np.abs(y - z)
+        maxerror = np.max(diferencia)
+        return maxerror < tol
+    
+    condicion1= tolerancia(matrizprimeracond,X)
+    condicion2=tolerancia(matrizsegundacond,Xp)
+    condicion3=tolerancia(matrizterceracond,multiplicar(X,Xp))
+    condicion4=tolerancia(matrizcuartacond,multiplicar(Xp,X))
+    
+    if condicion1 and condicion2 and condicion3 and condicion4 :
+        return True
+    else :
+        return False
+    
         
 
 
