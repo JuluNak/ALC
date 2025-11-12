@@ -480,76 +480,31 @@ def metpot2k(A, tol=1e-15, K=1000):
     #error = e - 1
     it = k
     return w, lam, it
-"""
+
 def diagRH(A, tol=1e-12, K=1000):
     n = A.shape[0]
-    Q_total = np.eye(n)
-    A_bis = A.copy()
-    k: int = 0
-    while k < K:
-        Q, R = QR_con_HH(A_bis)
-        A_bis = multiplicacionMatricial(R, Q)
-        Q_total = multiplicacionMatricial(Q_total, Q)
-        off_diag_norm = np.sqrt(np.sum(np.tril(A_bis, -1)**2))
-        if off_diag_norm < tol:
-            break
-        k += 1
-    E = np.diag(A_bis)
-# Ordenar por magnitud descendente
-    idx = np.argsort(np.abs(E))[::-1]
-    E = E[idx]
-    Q_total = Q_total[:, idx]
-
-    # Asegurar signo determinista de cada autovector
-    for i in range(Q_total.shape[1]):
-        if Q_total[0, i] < 0:
-            Q_total[:, i] *= -1    
-    return Q_total, E
-"""
-def diagRH(A, tol=1e-15, K=1000):
-    """
-    A: matriz simétrica de tamaño n×n
-    tol: tolerancia para decidir convergencia
-    K: número máximo de iteraciones
-
-    Retorna (S, D) tal que A ≈ S D S^T
-    Si A no es simétrica, retorna None.
-    """
-    # Verificar que A sea cuadrada
-    if A.shape[0] != A.shape[1]:
-        return None
-
-    # 🔹 Forzar simetría numérica (evita que retorne None por redondeo)
-    A = (A + A.T) / 2
-
-    # 🔹 Comprobación (más laxa)
-    if not np.allclose(A, A.T, atol=1e-10):
-        return None
-
-    n = A.shape[0]
-    A_k = np.copy(A)
-    S = np.eye(n)  # acumulador de autovectores
-
-    for k in range(K):
-        # Descomposición QR
-        Q, R = np.linalg.qr(A_k)
-
-        # Nueva iteración
-        A_k = R @ Q
-        S = S @ Q  # acumulamos los autovectores
-
-        # Chequear convergencia
-        off_diag_norm = np.sqrt(np.sum(np.tril(A_k, -1) ** 2))
-        if off_diag_norm < tol:
-            break
-
-    # 🔹 Ordenar autovalores y autovectores (opcional pero recomendable)
-    D_diag = np.diag(A_k)
-    idx = np.argsort(-np.abs(D_diag))  # de mayor a menor
-    D = np.diag(D_diag[idx])
-    S = S[:, idx]
+    v, lam = metpot2k(A, tol, K)[0], metpot2k(A, tol, K)[1]
+    resta = np.eye(n)[0] - v
+    H = np.eye(n) - np.inner(2*resta,resta) / norma(resta, 2)
+    if n == 2:
+        S = H
+        D = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
+    else:
+        B = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
+        A = B[2:n,2:n]
+        S, D = diagRH(A)
+        tam = D.shape[0]
+        D2 = np.zeros((tam + 1, tam + 1))
+        D2[0,0] = lam
+        D2[1:tam,1:tam] = D
+        tam = S.shape[0]
+        S2 = np.zeros((tam + 1),(tam + 1))
+        S2[1:tam,1:tam] = S
+        S2[0,0] = 1
+        S2 = multiplicacionMatricial(H, S2)
 
     return S, D
+
 
 
 def transiciones_al_azar_continuas(n):
@@ -669,103 +624,6 @@ def svd_reducida(A,k="max",tol=1e-15):
     
 #print(svd_reducida(genera_matriz_para_test(3)))
 """    
-def svd_reducida(A, k="max", tol=1e-15):
-    m, n = A.shape
-
-    # Paso i: diagonalizar A^T A
-    ATA = multiplicacionMatricial(traspuesta(A), A)
-    ATA = (ATA + traspuesta(ATA)) / 2  # asegurar simetría
-    V, D = diagRH(ATA)
-
-    if V is None or D is None:
-        return None, None, None
-
-    # Autovalores y valores singulares
-    E = np.diag(D)
-    S = np.sqrt(np.abs(E))
-
-    # Filtrar valores singulares pequeños
-    mask = S > tol
-    S = S[mask]
-    V = V[:, mask]
-
-    # Paso ii: calcular U = A V / σ
-    U_cols = []
-    for j in range(len(S)):
-        Avj = multiplicacionMatricial(A, V[:, j].reshape(-1, 1))
-        u_j = Avj / S[j]
-        # 🔹 normalización explícita
-        u_j = u_j / np.linalg.norm(u_j)
-        U_cols.append(u_j.flatten())
-
-    U = np.column_stack(U_cols)
-
-    # 🔹 re-ortogonalización por Gram-Schmidt para mayor precisión
-    for i in range(U.shape[1]):
-        for j in range(i):
-            U[:, i] -= np.dot(U[:, j], U[:, i]) * U[:, j]
-        U[:, i] /= np.linalg.norm(U[:, i])
-
-    return U, S, V
-
-# --------- FUNCIONES TP ------------
-
-import os
-
-def cargarDataset(carpeta):
-    """
-    Dado el path a una carpeta con subcarpetas 'train' y 'val',
-    cada una conteniendo 'gatos' y 'perros' con archivos .npy de embeddings,
-    retorna Xt, Yt, Xv, Yv.
-    """
-
-    # ---------- ENTRENAMIENTO ----------
-    X_list_t = []
-    Y_list_t = []
-    path_train = os.path.join(carpeta, "train")
-
-    for clase in ["gatos", "perros"]:
-        carpeta_clase = os.path.join(path_train, clase)
-        if not os.path.exists(carpeta_clase):
-            continue
-
-        for archivo in os.listdir(carpeta_clase):
-            if archivo.endswith(".npy"):
-                embedding = np.load(os.path.join(carpeta_clase, archivo)).reshape(-1, 1)
-                X_list_t.append(embedding)
-                if clase == "gatos":
-                    Y_list_t.append(np.array([[1], [0]]))
-                else:
-                    Y_list_t.append(np.array([[0], [1]]))
-
-    Xt = np.hstack(X_list_t)
-    Yt = np.hstack(Y_list_t)
-
-    # ---------- VALIDACIÓN ----------
-    X_list_v = []
-    Y_list_v = []
-    path_val = os.path.join(carpeta, "val")
-
-    for clase in ["gatos", "perros"]:
-        carpeta_clase = os.path.join(path_val, clase)
-        if not os.path.exists(carpeta_clase):
-            continue
-
-        for archivo in os.listdir(carpeta_clase):
-            if archivo.endswith(".npy"):
-                embedding = np.load(os.path.join(carpeta_clase, archivo)).reshape(-1, 1)
-                X_list_v.append(embedding)
-                if clase == "gatos":
-                    Y_list_v.append(np.array([[1], [0]]))
-                else:
-                    Y_list_v.append(np.array([[0], [1]]))
-
-    Xv = np.hstack(X_list_v)
-    Yv = np.hstack(Y_list_v)
-    return Xt, Yt, Xv, Yv
-    
-
-print(cargarDataset("template-alumnos"))
-    
-
+A = np.random.random((5,5))
+print(diagRH(A))
 
