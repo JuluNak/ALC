@@ -1,100 +1,24 @@
-import numpy as np
-
-#IMPORTANTE!!! , ENTIENDO Q LA ESTRUCTURA DEL TP ES:
-#CARGAS TUS DATOS DE X Y Y ...
-# LUEGO ENTIENDO Q POR EJEMPLO EN EL DE CHOLESKY SERIA ALGO ASI:
-#L=CHOLESKY (XTxX)
-#W=pinv.....(L,Y)
-# Y ASI CON LOS DEMAS ...
-#IMPORTANTE PREGUNTAR ESTO EL MARTES!!!(PARA VER SI LO ESTOY ENTENDIENDO BIEN)
-#EJERCICIO 2 (ALGORITMO 1)
-#HAY 2 MANERAS PQ NO SE CUAL ES LA CORRECTA INTERPRETACION DE LA CONSIGNA
-# EN LA MANERA 1 ESTAN LOS 3 CASOS
-# EN LA MANERA 2 FALTA EL ULTIMO
-#SE PODRA USAR LA INVERSA O ME EXIGE MUCHA COMPLEJIDAD??
-def cholesky(A):
-    n = len(A)
-    L = np.zeros_like(A, dtype=float)
-    for i in range(n):
-        for j in range(i + 1):
-            suma = 0
-            for k in range(j):
-                suma += L[i][k] * L[j][k]
-            if i == j:
-                L[i][j] = np.sqrt(A[i][i] - suma)
-            else:
-                L[i][j] = (A[i][j] - suma) /   L[j][j]
-    return L
-        
-
- 
-def traspuesta(A):   
-    filas = A.shape[0]
-    columnas = A.shape[1]
-    fil = 0
-    col = 0
-    res: list = []
-    for fil in range(0, columnas):
-        vector = []
-        for col in range(0, filas):
-            vector.append(A[col][fil])
-        vector = np.array(vector)
-        res.append(vector)
-    res = np.array(res)
-    return res
-
-def resolverTriangular(A, b, tipo):
-  
-    n = A.shape[0]
-    x = np.zeros_like(b, dtype=float)
-
-    if tipo == "inferior":
-        for i in range(n):
-            suma = 0
-            for k in range(i):
-                suma += A[i][k] * x[k]
-            x[i] = (b[i] - suma) / A[i][i]
-    else:  
-        for i in range(n - 1, -1, -1):
-            suma = 0
-            for k in range(i + 1, n):
-                suma += A[i][k] * x[k]
-            x[i] = (b[i] - suma) / A[i][i]
-
-    return x
-
-
-
-def multiplicar(A, B):
-  
-    filasA = A.shape[0]
-    colsA = A.shape[1]
-    colsB = B.shape[1]
-    C = np.zeros((filasA, colsB))
-    for i in range(filasA):
-        for j in range(colsB):
-            suma = 0
-            for k in range(colsA):
-                suma += A[i][k] * B[k][j]
-            C[i][j] = suma
-    return C
-def inversa(A):
-    return np.linalg.inv(A) #Vale usar linalg? es parte de numpy pero habria que preguntar
-     
-
 def intento3(X,Y,L):
-    #A = X . Xt . Vamos a factorizarlo a A = L . Lt para aplicar cholesky. 
+    #A = Xt . X . Vamos a factorizarlo a A = L . Lt para aplicar cholesky. 
+    #IDEA PARA ESTE EJERCICIO : ASUMIMOS (ESPERO Q SEA ASI) QUE YO POR EJEMPLO RECIBO UNA X DE 3X2 ENTONCES LA L Q ME VIENE YA ES LA CHOLESKY DE (XT.X) EN ESTE CASO
+    #PARA EL PRIMER CASO : LA IDEA RESOLVER EL SISTEMA L.LT.U=XT (SIENDO U LA PSEUDOINV DE X) , ENTONCES LO Q HAGO ES "DIVIDIRLO EN 2 PARTES" , PRIMER TOMO LA MULTIPLICACION
+    #LT.U = B , (LO LLAMO B), PARA Q ME QUEDE L.B=XT ( ESTO ES PQ L Y LT SON MATRICES TRIANGULARES Y TENGO UNA FUNCION Q ME AYUDA CON ESTAS)
+    #ENTONCES RESUELVO L.B=XT , OBTENGO B (!ACLARACION!: CUANDO CREO B PARA SABER SUS DIMENSIONES COMO L.B=XT , B TIENE Q TENER LA CANT DE COLUMNAS DE L(=CANT FILAS DE LT)(COMO FILAS) Y LA CANT DE COLUMNAS DE XT (COMO COLUMNAS) )
+    #LUEGO CON B OBTENIDA , RESUELVO LT.U=B , PARA CREAR U NECESITO SABER LAS DIMENSIONES Q TENGO Q TENER 
+    # POR ENUNCIADO SABEMOS Q U = (XT.X) A LA MENOS . XT , ES DECIR SI SON IGUALES <-> TIENEN LAS MISMAS DIMENSIONES  SI XT ES DE PXN Y X=ES DE NXP --> (XT.X) ES DE PXP (SU INVERSA IGUAL )
+    # Y SI HAGO PXP POR (LAS DIMENSIONES DE XT(ES DECIR PXN))=ME QUEDA Q U ES DE PXN(MISMAS DIMS Q XT)
+   
     XT=traspuesta(X)
-    dims=np.shape(X)
+    dimsX=np.shape(X)
     LT=traspuesta(L)
     dimxt=np.shape(XT)
     dimx=np.shape(X)
-    filasx=dimx[0]
+    filasx=dimsX[0]
     columnasx=dimx[1]
-    if dims[0]>dims[1]:
-        A = multiplicar(X,XT)
-        J=cholesky(A)
-        filasB = LT.shape[0]
+    if dimsX[0]>dimsX[1]:
+        A = multiplicar(XT,X)
+        L=cholesky(A)
+        filasB = XT.shape[0]
         columnasB = XT.shape[1]
         B= np.zeros((filasB, columnasB))
         for j in range(columnasB):
@@ -103,8 +27,8 @@ def intento3(X,Y,L):
              b.append(XT[i][j]) #donde b es cada vector columna de la matriz x traspuesta , asi puedo usar la funcion q me agarra una matriz y un vector y resuelve
             b = np.array(b)
             x_sol = resolverTriangular(L, b, "inferior") # aca es donde por cada columna uso la func
-            for i in range(filasB):
-                B[i][j] = x_sol[i]# aca lo agrego a la matriz
+            for k in range(filasB):
+                B[k][j] = x_sol[k]# aca lo agrego a la matriz
         
         
         filasU=dimxt[0]
@@ -117,7 +41,7 @@ def intento3(X,Y,L):
              b = np.array(b)
              x_sol = resolverTriangular(LT, b, "superior")
              for k in range(filasU):
-                U[i][j] = x_sol[k]
+                U[k][j] = x_sol[k]
             
             
     #luego como W=U.Y
@@ -126,42 +50,45 @@ def intento3(X,Y,L):
     
         return W
 
-    elif dims[0]<dims[1]:
+    elif dimsX[0]<dimsX[1]:
 
         #V x (X.XT) = XT
         #V x L.LT = XT
         #traspong todo =
         #L.LT.VT=X
-        #LT.VT=B
-        #L.B=X
-        #TENIENDO B --> LT.VT=B --> HALLARIAMOS VT , LUEGO TRASPONER VT  --> CONSEGUIS V
+        #LT.VT=B2
+        #L.B2=X
+        #TENIENDO B2 --> LT.VT=B2 --> HALLARIAMOS VT , LUEGO TRASPONER VT  --> CONSEGUIS V
+        
+        #IDEA PARA ESTE IF : EN LA CREACION DE B2 ES DECIR DE LT.VT, VAMOS A PENSARLO COMO ANTES O SINO COMO SABEMOS LA DIM DE V ,TMB SABRIAMOS LA DE VT Y POR ENDE LA DE B2
+        #SI QUIERO Q L.B2 =X , ENTONCES FILASB2= COLUMNAS L(filas x) Y COLUMNAS B2 =COLUMNAS X ( EN ESTE CASO COLUMNAS X )(EN ESTE CASO L ES CHOLESKY DE X.XT , LUEGO DIM DE L ES nxn)
         A = multiplicar(X,XT)
-        B2= np.zeros(( columnasx,columnasx))
-        filasB2=columnasx
+        B2= np.zeros(( filasx,columnasx))
+        filasB2=filasx
         columnasB2=columnasx
 
-        for i in range(columnasB2):
+        for j in range(columnasB2):
             b=[]
-            for j in range(filasB2):
-                b.append(X[j][i])#CHEQUEAR CON LOS TESTTTT!!!!
+            for i in range(filasB2):
+                b.append(X[i][j])#CHEQUEAR CON LOS TESTTTT!!!!
             b = np.array(b)
             x_sol = resolverTriangular(L, b, "inferior") # aca es donde por cada columna uso la func
-            for i in range(filasB2):
-                B2[i][j] = x_sol[i]
+            for k in range(filasB2):
+                B2[k][j] = x_sol[k]
 
         #LT.VT=B
-        filasvt=columnasx
+        filasvt=filasx
         columnasvt=columnasx
         VT=np.zeros((filasvt,columnasvt))
      
-        for i in range (columnasvt):
+        for j in range (columnasvt):
             b2=[]
-            for j in range(filasvt):
+            for i in range(filasvt):
                 b2.append(B2[i][j])
             b2=np.array(b2)
             xsol2=resolverTriangular(LT, b2, "superior")
             for k in range(filasvt):
-                VT[i][j] = xsol2[k]###VER TEMA INDICES
+                VT[k][j] = xsol2[k]###VER TEMA INDICES
 
         V=traspuesta(VT)
         W2=multiplicar(Y,V)
@@ -172,52 +99,6 @@ def intento3(X,Y,L):
         #Solo pasamos X al otro lado. Quedaria W = T.X^-1
         inv_X = inversa(X)
         return multiplicar(Y, inv_X)
-        
-
-"""
-def descomplu(A):
-    n = A.shape[0]
-    L = np.zeros((n, n), dtype=float)
-    for i in range(n):
-        L[i, i] = 1.0 #lo define como uno, pues es lower
-    U = A.copy()
-    ops = 0  #cont
-    for i in range(n):
-        if U[i, i] == 0:  # pivote=0
-            return None
-        for j in range(i+1, n):
-            L[j,i] = U[j, i] / U[i, i]
-            ops += 1
-            for m in range(i, n):
-                U[j, m] = U[j, m] - L[j, i] * U[i, m]
-                ops += 2  
-    return L, U, ops        
-Usar desc LU para calcular la inversa ---> importante para hacer 3er if de intento3()
-"""
-
-        
-    
-
-
-
-
-
-
-
-"""def intento2(X,Y,L):
-    XT=traspuesta(X)
-  
-  
-    shapex=np.shape(X)
-    
-
-
-    if shapex[0]>shapex[1]:
-        A=multiplicar(XT,X)
-        
-        L=cholesky(A)
-        LT=traspuesta(L)
-        #TENDRIA Q RESOLVER EL SISTEMA (L.Lt.U=xt)->(Lt.U=V),luego (l.v=xt)->(y como V=Lt.U)->resuelvo y obtengo U,donde U esla pseudo inversa de X
         
  
 
