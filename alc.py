@@ -8,6 +8,8 @@ Created on Fri Nov  7 11:51:05 2025
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import zipfile
+import io
 
 # --- LIBRERIAS ---
 def esCuadrada(A):
@@ -76,11 +78,11 @@ def traspuesta(A):
     filas = A.shape[0]
     columnas = A.shape[1]
     res: list = []
-    for fil in range(filas):
-        vector = []
-        for col in range(columnas):
-            vector.append(A[fil, col])
-        res.append(vector)
+    for col in range(columnas):
+        fila = []
+        for fil in range(filas):
+            fila.append(A[fil, col])
+        res.append(fila)
     res = np.array(res)
     return res
 
@@ -192,15 +194,6 @@ def hilbert(n):
             fila.append(1/(i+j+1))
         res.append(fila)
     return res
-
-print(hilbert(3))
-        
-    
-    #EJERCICIO 17
-    
-
-    
-
 
 # Definir polinomio
 def evaluar_polinomio1(x):
@@ -335,7 +328,7 @@ def condMC(A, p, Np):
 def condExacta(A, p):
     return normaExacta(A, p)*normaExacta(np.linalg.inv(A), p)
 
-def descomplu(A):
+def calculaLU(A):
     n = A.shape[0]
     L = np.zeros((n, n), dtype=float)
     for i in range(n):
@@ -353,7 +346,7 @@ def descomplu(A):
                 ops += 2  
     return L, U, ops
 
-def trigangularsupyinf(L, b, lower=True):
+def res_tri(L, b, lower=True):
     L = np.array(L, dtype=float)
     n= L.shape[0]
     x = []
@@ -385,6 +378,8 @@ def cholesky(A):
             else:
                 L[i][j] = (A[i][j] - suma) / L[j][j]
     return L
+
+
 
 def calcularxA(x,A):
     columnas = A.shape[1]
@@ -483,25 +478,48 @@ def metpot2k(A, tol=1e-15, K=1000):
 
 def diagRH(A, tol=1e-12, K=1000):
     n = A.shape[0]
-    v, lam = metpot2k(A, tol, K)[0], metpot2k(A, tol, K)[1]
-    resta = np.eye(n)[0] - v
-    H = np.eye(n) - np.inner(2*resta,resta) / norma(resta, 2)
+    if n == 0:
+        return np.eye(0), np.zeros((0, 0))  # caso base: matriz vacía
+    
+    if n == 1:
+        return np.eye(1), A.copy()
+
+    # 1. Primer autovector y autovalor dominante
+    v, lam, _ = metpot2k(A, tol, K)
+    v = v.reshape(-1, 1)
+    v = v / norma(v, 2)
+
+    # 2. Construcción de la reflexión de Householder
+    e1 = np.zeros((n, 1))
+    e1[0, 0] = 1.0
+    u = e1 - np.sign(v[0, 0]) * v
+    if norma(u, 2) < 1e-14:  # evitar división por cero
+        H = np.eye(n)
+    else:
+        u = u / norma(u, 2)
+        H = np.eye(n) - 2 * np.outer(u, u)
+
+    # 3. Aplicar reflexión
+    B = multiplicacionMatricial(multiplicacionMatricial(H, A), traspuesta(H))
+
+    # 4. Caso base recursivo
     if n == 2:
         S = H
-        D = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
+        D = B
     else:
-        B = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
-        A = B[2:n,2:n]
-        S, D = diagRH(A)
-        tam = D.shape[0]
-        D2 = np.zeros((tam + 1, tam + 1))
-        D2[0,0] = lam
-        D2[1:tam,1:tam] = D
-        tam = S.shape[0]
-        S2 = np.zeros((tam + 1),(tam + 1))
-        S2[1:tam,1:tam] = S
-        S2[0,0] = 1
-        S2 = multiplicacionMatricial(H, S2)
+        A2 = B[1:, 1:]
+        S2, D2 = diagRH(A2, tol, K)
+
+        D = np.zeros_like(A)
+        D[0, 0] = lam
+        D[1:, 1:] = D2
+
+        S = np.eye(n)
+        S[1:, 1:] = S2
+        S = multiplicacionMatricial(H, S)
+
+    # 5. Redondear errores numéricos pequeños
+    D[np.abs(D) < 1e-14] = 0
 
     return S, D
 
@@ -597,33 +615,199 @@ def multiplica_rala_vector(A,v):
     for (i, j), valor in dicc.items():
         w[i] += valor * v[j]
     return w
-"""
-def svd_reducida(A,k="max",tol=1e-15):
-    m = A.shape[0]
-    n = A.shape[1]
-    r = min(n,m)
+
+def svd_reducida(A, k="max", tol=1e-15):
+    m, n = A.shape
+    r = min(m, n)
+
+    # SVD reducida: A = U Σ Vᵗ
     if m >= n:
-        V, E = diagRH(multiplicacionMatricial(traspuesta(A), A))
-        print(E, V)
-        idx = np.argsort(E)[::-1]
-        print(idx)
-        #print(E ,V)
+        # Caso rectangular alto (más filas que columnas)
+        S, D = diagRH(multiplicacionMatricial(traspuesta(A), A))
+        V = S
         B = multiplicacionMatricial(A, V)
     else:
-        V, E = diagRH(multiplicacionMatricial(A, traspuesta(A)))
-        B = multiplicacionMatricial(traspuesta(A), V)
-    if B.ndim == 1:
-        B = B.reshape(-1, 1)
-    U = []
-    for j in range(r):
-        u = multiplicacionMatricial(A, V[:, j].reshape(-1, 1))
-        u /= norma(u, 2)
-        U.append(u.flatten())            # guardo como fila
-    U = np.column_stack(U)
-    return U, E, V
-    
-#print(svd_reducida(genera_matriz_para_test(3)))
-"""    
-A = np.random.random((5,5))
-print(diagRH(A))
+        # Caso rectangular ancho
+        S, D = diagRH(multiplicacionMatricial(A, traspuesta(A)))
+        U = S
+        B = multiplicacionMatricial(traspuesta(A), U)
 
+    # Extraer los valores singulares (positivos)
+    sigmas = np.sqrt(np.abs(np.diag(D)))
+
+    # Filtrar según k o tolerancia
+    if k == "max":
+        k = r
+    mask = sigmas > tol
+    sigmas = sigmas[mask]
+    k = min(k, len(sigmas))
+
+    sigmas = sigmas[:k]
+
+    # Construcción de U
+    if m >= n:
+        U = np.zeros((m, k))
+        for j in range(k):
+            if sigmas[j] > tol:
+                u = B[:, j] / sigmas[j]
+                U[:, j] = u
+    else:
+        V = np.zeros((n, k))
+        for j in range(k):
+            if sigmas[j] > tol:
+                v = B[:, j] / sigmas[j]
+                V[:, j] = v
+
+    # Matriz diagonal Σ
+    Σ = np.zeros((k, k))
+    np.fill_diagonal(Σ, sigmas)
+    if m >= n:
+        return U, Σ, V
+    else:
+        return U, Σ, V
+"""
+# Chequeos internos
+    print(f"\n--- Test interno ({m},{n}) ---")
+    print("UᵀU ≈ I?\n", np.round(U.T @ U, 4))
+    print("VᵀV ≈ I?\n", np.round(V.T @ V, 4))
+    print("A ≈ U Σ Vᵀ ? error =", np.linalg.norm(A - U @ np.diag(sigmas) @ V.T))
+"""
+
+
+# ITEM 1 (versión descomprimida)
+"""
+def cargar_conjunto(ruta_conjunto):
+    X_list, Y_list = [], []
+    
+    for root, _, files in os.walk(ruta_conjunto):
+        for file in files:
+            if file.endswith('.npy'):
+                ruta_completa = os.path.join(root, file)
+                
+                # Cargar el embedding
+                x = np.load(ruta_completa)
+                X_list.append(x.reshape(-1, 1))
+                
+                # Etiqueta según carpeta
+                if "cats" in root.lower():
+                    y = np.array([[1], [0]])
+                elif "dogs" in root.lower():
+                    y = np.array([[0], [1]])             
+                Y_list.append(y)
+    
+    # Convertir a matrices
+    X = np.hstack(X_list)
+    Y = np.hstack(Y_list)
+    
+    return X, Y
+
+
+def cargarDataset(carpeta_base):
+    # Entrenamiento
+    ruta_train = os.path.join(carpeta_base, "template-alumnos", "dataset", "cats_and_dogs", "train")
+    Xt, Yt = cargar_conjunto(ruta_train)
+    
+    # Validación
+    ruta_val = os.path.join(carpeta_base, "template-alumnos", "dataset", "cats_and_dogs", "val")
+    Xv, Yv = cargar_conjunto(ruta_val)
+    
+    return Xt, Yt, Xv, Yv
+
+Xt, Yt, Xv, Yv = cargarDataset("template-alumnos")
+
+print("Xt:", Xt.shape)
+print("Yt:", Yt.shape)
+print("Xv:", Xv.shape)
+print("Yv:", Yv.shape)
+"""
+
+# ITEM 1 (versión comprimida)
+def cargarDataset2(zip_base_path):
+
+    def cargar_conjunto2(zf_inner, tipo):
+        X_list = []
+        Y_list = []
+
+        nombres = zf_inner.namelist()
+
+        for nombre in nombres:
+            # Buscamos los archivos del conjunto correspondiente
+            if nombre.endswith(".npy") and ("/" + tipo + "/") in nombre:
+
+                archivo = zf_inner.open(nombre)
+                datos = archivo.read()
+                archivo.close()
+
+                arr = np.load(io.BytesIO(datos))
+                arr = arr.reshape(-1, 1)
+                X_list.append(arr)
+
+                # Determinar etiqueta según el nombre
+                if "cats" in nombre:
+                    y = np.array([[1.0], [0.0]])
+                    Y_list.append(y)
+                elif "dogs" in nombre:
+                    y = np.array([[0.0], [1.0]])
+                    Y_list.append(y)
+
+        X = np.hstack(X_list)
+        Y = np.hstack(Y_list)
+        return X, Y
+
+    # Abrimos el zip principal
+    zip_externo = zipfile.ZipFile(zip_base_path, "r")
+    nombres_externos = zip_externo.namelist()
+
+    # Buscamos el dataset.zip interno
+    dataset_zip_name = None
+    for n in nombres_externos:
+        if n.endswith("dataset.zip"):
+            dataset_zip_name = n
+
+    archivo_interno = zip_externo.open(dataset_zip_name)
+    datos_zip_interno = archivo_interno.read()
+    archivo_interno.close()
+    zip_externo.close()
+
+    # Abrimos el zip interno
+    zip_interno = zipfile.ZipFile(io.BytesIO(datos_zip_interno), "r")
+
+    Xt, Yt = cargar_conjunto2(zip_interno, "train")
+    Xv, Yv = cargar_conjunto2(zip_interno, "val")
+
+    zip_interno.close()
+
+    return Xt, Yt, Xv, Yv
+
+
+# Ejemplo de uso
+Xt, Yt, Xv, Yv = cargarDataset2("template-alumnos.zip")
+
+print("Xt:", Xt.shape)
+print("Yt:", Yt.shape)
+print("Xv:", Xv.shape)
+print("Yv:", Yv.shape)
+
+
+
+    
+def pinvSVD(U, S, V, Y):
+    m, n = S.shape
+    tol = 1e-15
+    
+    # Creo la matriz S+ (n x m)
+    S_plus = np.zeros((n, m))
+    
+    for i in range(min(m, n)):
+        if S[i, i] > tol:
+            S_plus[i, i] = 1 / S[i, i]
+    
+    # Calculo X+
+    X_plus = multiplicacionMatricial(multiplicacionMatricial(V, S_plus), traspuesta(U))
+    
+    # Calculo W
+    W = multiplicacionMatricial(X_plus, Y)
+    return W  
+
+    
+    
