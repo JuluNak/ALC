@@ -140,7 +140,7 @@ def pinvEcuacionesNormales(X,Y,L):
         
         #IDEA PARA ESTE IF : EN LA CREACION DE B2 ES DECIR DE LT.VT, VAMOS A PENSARLO COMO ANTES O SINO COMO SABEMOS LA DIM DE V ,TMB SABRIAMOS LA DE VT Y POR ENDE LA DE B2
         #SI QUIERO Q L.B2 =X , ENTONCES FILASB2= COLUMNAS L(filas x) Y COLUMNAS B2 =COLUMNAS X ( EN ESTE CASO COLUMNAS X )(EN ESTE CASO L ES CHOLESKY DE X.XT , LUEGO DIM DE L ES nxn)
-        A = multiplicar(X,XT)
+       
         B2= np.zeros(( filasx,columnasx))
         filasB2=filasx
         columnasB2=columnasx
