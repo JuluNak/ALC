@@ -95,8 +95,7 @@ def pinvEcuacionesNormales(X,Y,L):
     filasx=dimsX[0]
     columnasx=dimx[1]
     if dimsX[0]>dimsX[1]:
-        A = multiplicar(XT,X)
-        L=cholesky(A)
+    
         filasB = XT.shape[0]
         columnasB = XT.shape[1]
         B= np.zeros((filasB, columnasB))
