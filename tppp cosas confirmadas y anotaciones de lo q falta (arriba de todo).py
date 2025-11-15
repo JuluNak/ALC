@@ -181,14 +181,16 @@ def pinvEcuacionesNormales(X,Y,L):
 
 
 def espseudoinv(X,Xp,tol=1e-8):
-
-    matrizprimeracond=multiplicar(multiplicar(X,Xp),X)
-    matrizsegundacond=multiplicar(multiplicar(Xp,X),Xp)
-    matrizterceracond=traspuesta(multiplicar(X,Xp))
-    matrizcuartacond=traspuesta(multiplicar(Xp,X))
-
+    
     XXp = multiplicar(X, Xp)
     XpX = multiplicar(Xp, X)
+  
+    matrizprimeracond=multiplicar(XXp,X)
+    matrizsegundacond=multiplicar(XpX,Xp)
+    matrizterceracond=traspuesta(XXp)
+    matrizcuartacond=traspuesta(XpX)
+
+ 
     
     def tolerancia(y, z):
         diferencia = np.abs(y - z)
@@ -197,7 +199,7 @@ def espseudoinv(X,Xp,tol=1e-8):
     
     condicion1= tolerancia(matrizprimeracond,X)
     condicion2=tolerancia(matrizsegundacond,Xp)
-    condicion3=tolerancia(matrizterceracond,XXp))
+    condicion3=tolerancia(matrizterceracond,XXp)
     condicion4=tolerancia(matrizcuartacond,XpX)
     
     if condicion1 and condicion2 and condicion3 and condicion4 :
