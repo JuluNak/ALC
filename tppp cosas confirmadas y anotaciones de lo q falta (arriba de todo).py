@@ -186,7 +186,9 @@ def espseudoinv(X,Xp,tol=1e-8):
     matrizsegundacond=multiplicar(multiplicar(Xp,X),Xp)
     matrizterceracond=traspuesta(multiplicar(X,Xp))
     matrizcuartacond=traspuesta(multiplicar(Xp,X))
-    
+
+    XXp = multiplicar(X, Xp)
+    XpX = multiplicar(Xp, X)
     
     def tolerancia(y, z):
         diferencia = np.abs(y - z)
@@ -195,8 +197,8 @@ def espseudoinv(X,Xp,tol=1e-8):
     
     condicion1= tolerancia(matrizprimeracond,X)
     condicion2=tolerancia(matrizsegundacond,Xp)
-    condicion3=tolerancia(matrizterceracond,multiplicar(X,Xp))
-    condicion4=tolerancia(matrizcuartacond,multiplicar(Xp,X))
+    condicion3=tolerancia(matrizterceracond,XXp))
+    condicion4=tolerancia(matrizcuartacond,XpX)
     
     if condicion1 and condicion2 and condicion3 and condicion4 :
         return True
