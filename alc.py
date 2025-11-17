@@ -980,7 +980,38 @@ def pinvGramSchmidt(Q, R, Y):
     
     return W
 
+#item 5)
+
+def espseudoinv(X,Xp,tol=1e-8):
+    
+    XXp = multiplicar(X, Xp)
+    XpX = multiplicar(Xp, X)
+  
+    matrizprimeracond=multiplicar(XXp,X)
+    matrizsegundacond=multiplicar(XpX,Xp)
+    matrizterceracond=traspuesta(XXp)
+    matrizcuartacond=traspuesta(XpX)
+
+ 
+    
+    def tolerancia(y, z):
+        diferencia = np.abs(y - z)
+        maxerror = np.max(diferencia)
+        return maxerror < tol
+    
+    condicion1= tolerancia(matrizprimeracond,X)
+    condicion2=tolerancia(matrizsegundacond,Xp)
+    condicion3=tolerancia(matrizterceracond,XXp)
+    condicion4=tolerancia(matrizcuartacond,XpX)
+    
+    if condicion1 and condicion2 and condicion3 and condicion4 :
+        return True
+    else :
+        return False
+
+
     
     
+
 
 
