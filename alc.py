@@ -859,7 +859,7 @@ def pinvEcuacionesNormales(X,Y,L):
             
     #luego como W=U.Y
     
-        W=multiplicar(Y,U) ###CHEQUEAR ESTO!!!!!!!
+        W=multiplicar(U,Y) ###CHEQUEAR ESTO!!!!!!!
     
         return W
 
@@ -904,14 +904,14 @@ def pinvEcuacionesNormales(X,Y,L):
                 VT[k][j] = xsol2[k]###VER TEMA INDICES
 
         V=traspuesta(VT)
-        W2=multiplicar(Y,V)
+        W2=multiplicar(V,T)
         return W2
     else:
         # pseudo(X) = inv(X)
         #Tenemos que WX = Y. 
         #Solo pasamos X al otro lado. Quedaria W = T.X^-1
         inv_X = inversa(X)
-        return multiplicar(Y, inv_X)
+        return multiplicar(inv_X, Y)
 
 
 #item4)
@@ -951,7 +951,7 @@ def pinvHouseHolder(Q,R,Y):
         
     V=traspuesta(VT)
     
-    W=multiplicar(Y,V)
+    W=multiplicar(V,Y)
     
     return W
     
@@ -976,7 +976,7 @@ def pinvGramSchmidt(Q, R, Y):
         
     V=traspuesta(VT)
     
-    W=multiplicar(Y,V)
+    W=multiplicar(V,Y)
     
     return W
 
@@ -1012,6 +1012,7 @@ def espseudoinv(X,Xp,tol=1e-8):
 
     
     
+
 
 
 
