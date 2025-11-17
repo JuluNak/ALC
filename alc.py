@@ -8,8 +8,6 @@ Created on Fri Nov  7 11:51:05 2025
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import zipfile
-import io
 
 # --- LIBRERIAS ---
 def esCuadrada(A):
@@ -78,11 +76,11 @@ def traspuesta(A):
     filas = A.shape[0]
     columnas = A.shape[1]
     res: list = []
-    for col in range(columnas):
-        fila = []
-        for fil in range(filas):
-            fila.append(A[fil, col])
-        res.append(fila)
+    for fil in range(filas):
+        vector = []
+        for col in range(columnas):
+            vector.append(A[fil, col])
+        res.append(vector)
     res = np.array(res)
     return res
 
@@ -194,6 +192,15 @@ def hilbert(n):
             fila.append(1/(i+j+1))
         res.append(fila)
     return res
+
+print(hilbert(3))
+        
+    
+    #EJERCICIO 17
+    
+
+    
+
 
 # Definir polinomio
 def evaluar_polinomio1(x):
@@ -328,7 +335,7 @@ def condMC(A, p, Np):
 def condExacta(A, p):
     return normaExacta(A, p)*normaExacta(np.linalg.inv(A), p)
 
-def calculaLU(A):
+def descomplu(A):
     n = A.shape[0]
     L = np.zeros((n, n), dtype=float)
     for i in range(n):
@@ -346,7 +353,7 @@ def calculaLU(A):
                 ops += 2  
     return L, U, ops
 
-def res_tri(L, b, lower=True):
+def trigangularsupyinf(L, b, lower=True):
     L = np.array(L, dtype=float)
     n= L.shape[0]
     x = []
@@ -378,8 +385,6 @@ def cholesky(A):
             else:
                 L[i][j] = (A[i][j] - suma) / L[j][j]
     return L
-
-
 
 def calcularxA(x,A):
     columnas = A.shape[1]
@@ -478,48 +483,25 @@ def metpot2k(A, tol=1e-15, K=1000):
 
 def diagRH(A, tol=1e-12, K=1000):
     n = A.shape[0]
-    if n == 0:
-        return np.eye(0), np.zeros((0, 0))  # caso base: matriz vacía
-    
-    if n == 1:
-        return np.eye(1), A.copy()
-
-    # 1. Primer autovector y autovalor dominante
-    v, lam, _ = metpot2k(A, tol, K)
-    v = v.reshape(-1, 1)
-    v = v / norma(v, 2)
-
-    # 2. Construcción de la reflexión de Householder
-    e1 = np.zeros((n, 1))
-    e1[0, 0] = 1.0
-    u = e1 - np.sign(v[0, 0]) * v
-    if norma(u, 2) < 1e-14:  # evitar división por cero
-        H = np.eye(n)
-    else:
-        u = u / norma(u, 2)
-        H = np.eye(n) - 2 * np.outer(u, u)
-
-    # 3. Aplicar reflexión
-    B = multiplicacionMatricial(multiplicacionMatricial(H, A), traspuesta(H))
-
-    # 4. Caso base recursivo
+    v, lam = metpot2k(A, tol, K)[0], metpot2k(A, tol, K)[1]
+    resta = np.eye(n)[0] - v
+    H = np.eye(n) - np.inner(2*resta,resta) / norma(resta, 2)
     if n == 2:
         S = H
-        D = B
+        D = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
     else:
-        A2 = B[1:, 1:]
-        S2, D2 = diagRH(A2, tol, K)
-
-        D = np.zeros_like(A)
-        D[0, 0] = lam
-        D[1:, 1:] = D2
-
-        S = np.eye(n)
-        S[1:, 1:] = S2
-        S = multiplicacionMatricial(H, S)
-
-    # 5. Redondear errores numéricos pequeños
-    D[np.abs(D) < 1e-14] = 0
+        B = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
+        A = B[2:n,2:n]
+        S, D = diagRH(A)
+        tam = D.shape[0]
+        D2 = np.zeros((tam + 1, tam + 1))
+        D2[0,0] = lam
+        D2[1:tam,1:tam] = D
+        tam = S.shape[0]
+        S2 = np.zeros((tam + 1),(tam + 1))
+        S2[1:tam,1:tam] = S
+        S2[0,0] = 1
+        S2 = multiplicacionMatricial(H, S2)
 
     return S, D
 
@@ -615,404 +597,33 @@ def multiplica_rala_vector(A,v):
     for (i, j), valor in dicc.items():
         w[i] += valor * v[j]
     return w
-
-def svd_reducida(A, k="max", tol=1e-15):
-    m, n = A.shape
-    r = min(m, n)
-
-    # SVD reducida: A = U Σ Vᵗ
+"""
+def svd_reducida(A,k="max",tol=1e-15):
+    m = A.shape[0]
+    n = A.shape[1]
+    r = min(n,m)
     if m >= n:
-        # Caso rectangular alto (más filas que columnas)
-        S, D = diagRH(multiplicacionMatricial(traspuesta(A), A))
-        V = S
+        V, E = diagRH(multiplicacionMatricial(traspuesta(A), A))
+        print(E, V)
+        idx = np.argsort(E)[::-1]
+        print(idx)
+        #print(E ,V)
         B = multiplicacionMatricial(A, V)
     else:
-        # Caso rectangular ancho
-        S, D = diagRH(multiplicacionMatricial(A, traspuesta(A)))
-        U = S
-        B = multiplicacionMatricial(traspuesta(A), U)
-
-    # Extraer los valores singulares (positivos)
-    sigmas = np.sqrt(np.abs(np.diag(D)))
-
-    # Filtrar según k o tolerancia
-    if k == "max":
-        k = r
-    mask = sigmas > tol
-    sigmas = sigmas[mask]
-    k = min(k, len(sigmas))
-
-    sigmas = sigmas[:k]
-
-    # Construcción de U
-    if m >= n:
-        U = np.zeros((m, k))
-        for j in range(k):
-            if sigmas[j] > tol:
-                u = B[:, j] / sigmas[j]
-                U[:, j] = u
-    else:
-        V = np.zeros((n, k))
-        for j in range(k):
-            if sigmas[j] > tol:
-                v = B[:, j] / sigmas[j]
-                V[:, j] = v
-
-    # Matriz diagonal Σ
-    Σ = np.zeros((k, k))
-    np.fill_diagonal(Σ, sigmas)
-    if m >= n:
-        return U, Σ, V
-    else:
-        return U, Σ, V
-"""
-# Chequeos internos
-    print(f"\n--- Test interno ({m},{n}) ---")
-    print("UᵀU ≈ I?\n", np.round(U.T @ U, 4))
-    print("VᵀV ≈ I?\n", np.round(V.T @ V, 4))
-    print("A ≈ U Σ Vᵀ ? error =", np.linalg.norm(A - U @ np.diag(sigmas) @ V.T))
-"""
-
-
-# ITEM 1 (versión descomprimida)
-"""
-def cargar_conjunto(ruta_conjunto):
-    X_list, Y_list = [], []
+        V, E = diagRH(multiplicacionMatricial(A, traspuesta(A)))
+        B = multiplicacionMatricial(traspuesta(A), V)
+    if B.ndim == 1:
+        B = B.reshape(-1, 1)
+    U = []
+    for j in range(r):
+        u = multiplicacionMatricial(A, V[:, j].reshape(-1, 1))
+        u /= norma(u, 2)
+        U.append(u.flatten())            # guardo como fila
+    U = np.column_stack(U)
+    return U, E, V
     
-    for root, _, files in os.walk(ruta_conjunto):
-        for file in files:
-            if file.endswith('.npy'):
-                ruta_completa = os.path.join(root, file)
-                
-                # Cargar el embedding
-                x = np.load(ruta_completa)
-                X_list.append(x.reshape(-1, 1))
-                
-                # Etiqueta según carpeta
-                if "cats" in root.lower():
-                    y = np.array([[1], [0]])
-                elif "dogs" in root.lower():
-                    y = np.array([[0], [1]])             
-                Y_list.append(y)
-    
-    # Convertir a matrices
-    X = np.hstack(X_list)
-    Y = np.hstack(Y_list)
-    
-    return X, Y
-
-
-def cargarDataset(carpeta_base):
-    # Entrenamiento
-    ruta_train = os.path.join(carpeta_base, "template-alumnos", "dataset", "cats_and_dogs", "train")
-    Xt, Yt = cargar_conjunto(ruta_train)
-    
-    # Validación
-    ruta_val = os.path.join(carpeta_base, "template-alumnos", "dataset", "cats_and_dogs", "val")
-    Xv, Yv = cargar_conjunto(ruta_val)
-    
-    return Xt, Yt, Xv, Yv
-
-Xt, Yt, Xv, Yv = cargarDataset("template-alumnos")
-
-print("Xt:", Xt.shape)
-print("Yt:", Yt.shape)
-print("Xv:", Xv.shape)
-print("Yv:", Yv.shape)
-"""
-
-# ITEM 1 (versión comprimida)
-def cargarDataset2(zip_base_path):
-
-    def cargar_conjunto2(zf_inner, tipo):
-        X_list = []
-        Y_list = []
-
-        nombres = zf_inner.namelist()
-
-        for nombre in nombres:
-            # Buscamos los archivos del conjunto correspondiente
-            if nombre.endswith(".npy") and ("/" + tipo + "/") in nombre:
-
-                archivo = zf_inner.open(nombre)
-                datos = archivo.read()
-                archivo.close()
-
-                arr = np.load(io.BytesIO(datos))
-                arr = arr.reshape(-1, 1)
-                X_list.append(arr)
-
-                # Determinar etiqueta según el nombre
-                if "cats" in nombre:
-                    y = np.array([[1.0], [0.0]])
-                    Y_list.append(y)
-                elif "dogs" in nombre:
-                    y = np.array([[0.0], [1.0]])
-                    Y_list.append(y)
-
-        X = np.hstack(X_list)
-        Y = np.hstack(Y_list)
-        return X, Y
-
-    # Abrimos el zip principal
-    zip_externo = zipfile.ZipFile(zip_base_path, "r")
-    nombres_externos = zip_externo.namelist()
-
-    # Buscamos el dataset.zip interno
-    dataset_zip_name = None
-    for n in nombres_externos:
-        if n.endswith("dataset.zip"):
-            dataset_zip_name = n
-
-    archivo_interno = zip_externo.open(dataset_zip_name)
-    datos_zip_interno = archivo_interno.read()
-    archivo_interno.close()
-    zip_externo.close()
-
-    # Abrimos el zip interno
-    zip_interno = zipfile.ZipFile(io.BytesIO(datos_zip_interno), "r")
-
-    Xt, Yt = cargar_conjunto2(zip_interno, "train")
-    Xv, Yv = cargar_conjunto2(zip_interno, "val")
-
-    zip_interno.close()
-
-    return Xt, Yt, Xv, Yv
-
-
-# Ejemplo de uso
-Xt, Yt, Xv, Yv = cargarDataset2("template-alumnos.zip")
-
-print("Xt:", Xt.shape)
-print("Yt:", Yt.shape)
-print("Xv:", Xv.shape)
-print("Yv:", Yv.shape)
-
-
-
-    
-def pinvSVD(U, S, V, Y):
-    m, n = S.shape
-    tol = 1e-15
-    
-    # Creo la matriz S+ (n x m)
-    S_plus = np.zeros((n, m))
-    
-    for i in range(min(m, n)):
-        if S[i, i] > tol:
-            S_plus[i, i] = 1 / S[i, i]
-    
-    # Calculo X+
-    X_plus = multiplicacionMatricial(multiplicacionMatricial(V, S_plus), traspuesta(U))
-    
-    # Calculo W
-    W = multiplicacionMatricial(X_plus, Y)
-    return W  
-
-
-#item2)
-
-def pinvEcuacionesNormales(X,Y,L):
-    #A = Xt . X . Vamos a factorizarlo a A = L . Lt para aplicar cholesky. 
-    #IDEA PARA ESTE EJERCICIO : ASUMIMOS (ESPERO Q SEA ASI) QUE YO POR EJEMPLO RECIBO UNA X DE 3X2 ENTONCES LA L Q ME VIENE YA ES LA CHOLESKY DE (XT.X) EN ESTE CASO
-    #PARA EL PRIMER CASO : LA IDEA RESOLVER EL SISTEMA L.LT.U=XT (SIENDO U LA PSEUDOINV DE X) , ENTONCES LO Q HAGO ES "DIVIDIRLO EN 2 PARTES" , PRIMER TOMO LA MULTIPLICACION
-    #LT.U = B , (LO LLAMO B), PARA Q ME QUEDE L.B=XT ( ESTO ES PQ L Y LT SON MATRICES TRIANGULARES Y TENGO UNA FUNCION Q ME AYUDA CON ESTAS)
-    #ENTONCES RESUELVO L.B=XT , OBTENGO B (!ACLARACION!: CUANDO CREO B PARA SABER SUS DIMENSIONES COMO L.B=XT , B TIENE Q TENER LA CANT DE COLUMNAS DE L(=CANT FILAS DE LT)(COMO FILAS) Y LA CANT DE COLUMNAS DE XT (COMO COLUMNAS) )
-    #LUEGO CON B OBTENIDA , RESUELVO LT.U=B , PARA CREAR U NECESITO SABER LAS DIMENSIONES Q TENGO Q TENER 
-    # POR ENUNCIADO SABEMOS Q U = (XT.X) A LA MENOS . XT , ES DECIR SI SON IGUALES <-> TIENEN LAS MISMAS DIMENSIONES  SI XT ES DE PXN Y X=ES DE NXP --> (XT.X) ES DE PXP (SU INVERSA IGUAL )
-    # Y SI HAGO PXP POR (LAS DIMENSIONES DE XT(ES DECIR PXN))=ME QUEDA Q U ES DE PXN(MISMAS DIMS Q XT)
-   
-    XT=traspuesta(X)
-    dimsX=np.shape(X)
-    LT=traspuesta(L)
-    dimxt=np.shape(XT)
-    dimx=np.shape(X)
-    filasx=dimsX[0]
-    columnasx=dimx[1]
-    if dimsX[0]>dimsX[1]:
-    
-        filasB = XT.shape[0]
-        columnasB = XT.shape[1]
-        B= np.zeros((filasB, columnasB))
-        for j in range(columnasB):
-            b = []
-            for i in range(filasB):
-             b.append(XT[i][j]) #donde b es cada vector columna de la matriz x traspuesta , asi puedo usar la funcion q me agarra una matriz y un vector y resuelve
-            b = np.array(b)
-            x_sol = resolverTriangular(L, b, "inferior") # aca es donde por cada columna uso la func
-            for k in range(filasB):
-                B[k][j] = x_sol[k]# aca lo agrego a la matriz
-        
-        
-        filasU=dimxt[0]
-        columnasU=dimxt[1]
-        U = np.zeros((filasU , columnasU))
-        for j in range(columnasU):
-             b = []
-             for i in range(filasU):
-                  b.append(B[i][j])
-             b = np.array(b)
-             x_sol = resolverTriangular(LT, b, "superior")
-             for k in range(filasU):
-                U[k][j] = x_sol[k]
-            
-            
-    #luego como W=U.Y
-    
-        W=multiplicar(U,Y) ###CHEQUEAR ESTO!!!!!!!
-    
-        return W
-
-    elif dimsX[0]<dimsX[1]:
-
-        #V x (X.XT) = XT
-        #V x L.LT = XT
-        #traspong todo =
-        #L.LT.VT=X
-        #LT.VT=B2
-        #L.B2=X
-        #TENIENDO B2 --> LT.VT=B2 --> HALLARIAMOS VT , LUEGO TRASPONER VT  --> CONSEGUIS V
-        
-        #IDEA PARA ESTE IF : EN LA CREACION DE B2 ES DECIR DE LT.VT, VAMOS A PENSARLO COMO ANTES O SINO COMO SABEMOS LA DIM DE V ,TMB SABRIAMOS LA DE VT Y POR ENDE LA DE B2
-        #SI QUIERO Q L.B2 =X , ENTONCES FILASB2= COLUMNAS L(filas x) Y COLUMNAS B2 =COLUMNAS X ( EN ESTE CASO COLUMNAS X )(EN ESTE CASO L ES CHOLESKY DE X.XT , LUEGO DIM DE L ES nxn)
-       
-        B2= np.zeros(( filasx,columnasx))
-        filasB2=filasx
-        columnasB2=columnasx
-
-        for j in range(columnasB2):
-            b=[]
-            for i in range(filasB2):
-                b.append(X[i][j])#CHEQUEAR CON LOS TESTTTT!!!!
-            b = np.array(b)
-            x_sol = resolverTriangular(L, b, "inferior") # aca es donde por cada columna uso la func
-            for k in range(filasB2):
-                B2[k][j] = x_sol[k]
-
-        #LT.VT=B
-        filasvt=filasx
-        columnasvt=columnasx
-        VT=np.zeros((filasvt,columnasvt))
-     
-        for j in range (columnasvt):
-            b2=[]
-            for i in range(filasvt):
-                b2.append(B2[i][j])
-            b2=np.array(b2)
-            xsol2=resolverTriangular(LT, b2, "superior")
-            for k in range(filasvt):
-                VT[k][j] = xsol2[k]###VER TEMA INDICES
-
-        V=traspuesta(VT)
-        W2=multiplicar(V,T)
-        return W2
-    else:
-        # pseudo(X) = inv(X)
-        #Tenemos que WX = Y. 
-        #Solo pasamos X al otro lado. Quedaria W = T.X^-1
-        inv_X = inversa(X)
-        return multiplicar(inv_X, Y)
-
-
-#item4)
-
-def pinvHouseHolder(Q,R,Y): 
-    #IDEAS: PLANTEEMOS LO Q NOS DICE EL ALGORITMO 3 , YO QUIERO HALLAR PRIMERO X+,LLAMEMOSLO "V",(ALL ESTO USANDO QUE (QR= XT))
-    #LUEGO V= Q.(RT)-1 
-    #AHORA MULTIPLICO AMBOS LADOS POR RT Y LLEGO A QUE V.RT=Q
-    #LUEGO TRASPONGO LA IGUALDAD PARA  Q ME QUEDE MAS COMODO Y PODER USAR LA FUNCION Q"RESOLVERTRIANGULAR)
-    #ME QUEDA QUE R.VT=QT
-    #FINALMENTE W=V.Y
-    #PARENTESIS R ES TRIANG SUP
-    #:)
-    #ACLARACION SOBRE CREACION DE MATRIZ VT , SOBRE SUS DIMENSIONES : VT TIENE Q TENER LA SIGUIENTE DIMENSION , R ES CUADRADA LUEGO R ES nxn Q ES RECTANGULAR)? DIRIA ASI 
-    #HAGAMOS Q ES DE pxn esto implicaria q QT es nxp y si yo estoy BUSCANDO LA DIMESION DE UNA MATRIZ TAL QUE VALGA R.VT=QT 
-    #nxn X ?? = nxp , SABEMOS Q LA CANT DE FILAS DE VT TIENE Q SER N PUES SINO NO VALDRIA LA MULTIPLICACION Y SI COMO RESULTANTE ME QUEDA UNA MATRIZ DE PXN 
-    #ENTONCES VT TIENE Q SER DE DIM NXP
-    #Y POR ESTO ME CREO LA MATRIZ VT CON LAS MISMAS DIM Q QT
-    
-    
-    QT = traspuesta(Q)
-    dimsQT=np.shape(QT)
-    n=dimsQT[0]
-    p=dimsQT[1]
-    VT = np.zeros((n, p))
-    
-    for j in range (p):
-        b=[]
-        for i in range(n):
-            b.append(QT[i][j])#ESTOS INDICEES VAN BIEN??
-        b=np.array(b)
-        soluc=resolverTriangular(R,b,"superior")
-        
-        for k in range(n):
-            VT[k][j]=soluc[k]#MISMO PARA ACA , ESTOS INDICES TAN BIEN??
-            
-        
-    V=traspuesta(VT)
-    
-    W=multiplicar(V,Y)
-    
-    return W
-    
-def pinvGramSchmidt(Q, R, Y):
-    
-    QT = traspuesta(Q)
-    dimsQT=np.shape(QT)
-    n=dimsQT[0]
-    p=dimsQT[1]
-    VT = np.zeros((n, p))
-    
-    for j in range (p):
-        b=[]
-        for i in range(n):
-            b.append(QT[i][j])
-        b=np.array(b)
-        soluc=resolverTriangular(R,b,"superior")
-        
-        for k in range(n):
-            VT[k][j]=soluc[k]
-            
-        
-    V=traspuesta(VT)
-    
-    W=multiplicar(V,Y)
-    
-    return W
-
-#item 5)
-
-def espseudoinv(X,Xp,tol=1e-8):
-    
-    XXp = multiplicar(X, Xp)
-    XpX = multiplicar(Xp, X)
-  
-    matrizprimeracond=multiplicar(XXp,X)
-    matrizsegundacond=multiplicar(XpX,Xp)
-    matrizterceracond=traspuesta(XXp)
-    matrizcuartacond=traspuesta(XpX)
-
- 
-    
-    def tolerancia(y, z):
-        diferencia = np.abs(y - z)
-        maxerror = np.max(diferencia)
-        return maxerror < tol
-    
-    condicion1= tolerancia(matrizprimeracond,X)
-    condicion2=tolerancia(matrizsegundacond,Xp)
-    condicion3=tolerancia(matrizterceracond,XXp)
-    condicion4=tolerancia(matrizcuartacond,XpX)
-    
-    if condicion1 and condicion2 and condicion3 and condicion4 :
-        return True
-    else :
-        return False
-
-
-    
-    
-
-
-
+#print(svd_reducida(genera_matriz_para_test(3)))
+"""    
+A = np.random.random((5,5))
+print(diagRH(A))
 
