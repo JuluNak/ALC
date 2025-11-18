@@ -163,11 +163,14 @@ X = np.array([
 
 
 Y = np.array([
-    [1, 0],
-    [0, 1],
-    [1, 1],
-    [2, 1],
-    [0, 2]
+    [1, 0,2],
+    [0, 1,3],
+    [1, 1,4],
+    [2, 1,5],
+    [0, 2,6]
 ], dtype=float)
 
+
 L = cholesky(multiplicacionMatricial(traspuesta(X), X))
+
+print(pinvEcuacionesNormales(X, L, Y))
