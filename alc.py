@@ -8,6 +8,11 @@ Created on Fri Nov  7 11:51:05 2025
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import zipfile
+import io
+
+# --- AUXILIARES ---
+
 
 # --- LIBRERIAS ---
 def esCuadrada(A):
@@ -76,11 +81,11 @@ def traspuesta(A):
     filas = A.shape[0]
     columnas = A.shape[1]
     res: list = []
-    for fil in range(filas):
-        vector = []
-        for col in range(columnas):
-            vector.append(A[fil, col])
-        res.append(vector)
+    for col in range(columnas):
+        fila = []
+        for fil in range(filas):
+            fila.append(A[fil, col])
+        res.append(fila)
     res = np.array(res)
     return res
 
@@ -192,15 +197,6 @@ def hilbert(n):
             fila.append(1/(i+j+1))
         res.append(fila)
     return res
-
-print(hilbert(3))
-        
-    
-    #EJERCICIO 17
-    
-
-    
-
 
 # Definir polinomio
 def evaluar_polinomio1(x):
@@ -329,35 +325,41 @@ def normaExacta(A, p):
 
 
 def condMC(A, p, Np):
-    return normaMatMC(A, p, p, Np)[0]*normaMatMC(np.linalg.inv(A), p, p, Np)[0]
+    return normaMatMC(A, p, p, Np)[0]*normaMatMC(inversa(A), p, p, Np)[0]
 
 
 def condExacta(A, p):
-    return normaExacta(A, p)*normaExacta(np.linalg.inv(A), p)
+    return normaExacta(A, p)*normaExacta(inversa(A), p)
 
-def descomplu(A):
-    n = A.shape[0]
+def calculaLU(A):
+    if A is None: # caso matriz nula
+        return None, None, 0
+    n, m = A.shape
+    if m != n: # caso matriz no cuadrada
+        return None, None, 0
     L = np.zeros((n, n), dtype=float)
     for i in range(n):
         L[i, i] = 1.0 #lo define como uno, pues es lower
     U = A.copy()
     ops = 0  #cont
     for i in range(n):
-        if U[i, i] == 0:  # pivote=0
-            return None
+        piv = U[i,i]
+        if piv == 0:  # pivote=0
+            return None, None, 0
         for j in range(i+1, n):
-            L[j,i] = U[j, i] / U[i, i]
+            L[j,i] = U[j, i] / piv
             ops += 1
-            for m in range(i, n):
+            for m in range(i + 1, n):
                 U[j, m] = U[j, m] - L[j, i] * U[i, m]
                 ops += 2  
+            U[j, i] = 0
     return L, U, ops
 
-def trigangularsupyinf(L, b, lower=True):
+def res_tri(L, b, inferior=True):
     L = np.array(L, dtype=float)
     n= L.shape[0]
     x = []
-    if lower:  # triangularizacion inferior 
+    if inferior == True:  # triangularizacion inferior 
         for i in range(n):
             h = 0.0
             for j in range(i):
@@ -372,6 +374,21 @@ def trigangularsupyinf(L, b, lower=True):
         x = x[::-1]  # invierto la lista
     return x
 
+def inversa(A):
+    n = A.shape[0]
+    L, U, _ = calculaLU(A)
+    if L is None or U is None:
+        return None
+
+    A_inv = np.zeros((n, n))
+    for i in range(n):
+        e = np.zeros(n)
+        e[i] = 1.0
+        y = res_tri(L, e, inferior=True)
+        x = res_tri(U, y, inferior=False)
+        A_inv[:, i] = x
+    return A_inv
+
 def cholesky(A):
     n = len(A)
     L = np.zeros_like(A, dtype=float)
@@ -385,6 +402,26 @@ def cholesky(A):
             else:
                 L[i][j] = (A[i][j] - suma) / L[j][j]
     return L
+
+def calculaLDV(A):
+    L, U, _ = calculaLU(A)
+    if L is None or U is None:
+        return None, None, None
+
+    D = diagonal(U)
+    V = multiplicacionMatricial(inversa(D), U)
+    return L, D, V
+
+def esSDP(A,atol=1e-8):
+    L, D, _ = calculaLDV(A)
+    if L is None:
+        return False   
+    n = A.shape[0]
+    res = True
+    for i in range(n):
+        if not D[i, i] > atol:
+            return False
+    return res
 
 def calcularxA(x,A):
     columnas = A.shape[1]
@@ -466,14 +503,14 @@ def calculaQR(A,metodo,tol=1e-12):
 def metpot2k(A, tol=1e-15, K=1000):
     n = A.shape[1]
     v = np.random.randn(n)
-    v /= np.linalg.norm(v)
+    v /= norma(v, 2)
     w = calcularAx(A, v)
     e = np.inner(w, v)
     k = 0
     while (abs(e - 1) > tol) and (k < K):
         v = w
         w = calcularAx(A, v)
-        w /= np.linalg.norm(w)
+        w /= norma(w, 2)
         e = np.inner(w, v)
         k += 1
     lam = np.inner(calcularxA(w, A), w)
@@ -483,25 +520,48 @@ def metpot2k(A, tol=1e-15, K=1000):
 
 def diagRH(A, tol=1e-12, K=1000):
     n = A.shape[0]
-    v, lam = metpot2k(A, tol, K)[0], metpot2k(A, tol, K)[1]
-    resta = np.eye(n)[0] - v
-    H = np.eye(n) - np.inner(2*resta,resta) / norma(resta, 2)
+    if n == 0:
+        return np.eye(0), np.zeros((0, 0))  # caso base: matriz vacía
+    
+    if n == 1:
+        return np.eye(1), A.copy()
+
+    # Primer autovector y autovalor dominante
+    v, lam, _ = metpot2k(A, tol, K)
+    v = v.reshape(-1, 1)
+    v = v / norma(v, 2)
+
+    # Construcción de la reflexión de Householder
+    e1 = np.zeros((n, 1))
+    e1[0, 0] = 1.0
+    u = e1 - np.sign(v[0, 0]) * v
+    if norma(u, 2) < 1e-14:  # evitar división por cero
+        H = np.eye(n)
+    else:
+        u = u / norma(u, 2)
+        H = np.eye(n) - 2 * np.outer(u, u)
+
+    # Aplicar reflexión
+    B = multiplicacionMatricial(multiplicacionMatricial(H, A), traspuesta(H))
+
+    # Caso base
     if n == 2:
         S = H
-        D = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
+        D = B
     else:
-        B = multiplicacionMatricial(multiplicacionMatricial(H,A), traspuesta(H))
-        A = B[2:n,2:n]
-        S, D = diagRH(A)
-        tam = D.shape[0]
-        D2 = np.zeros((tam + 1, tam + 1))
-        D2[0,0] = lam
-        D2[1:tam,1:tam] = D
-        tam = S.shape[0]
-        S2 = np.zeros((tam + 1),(tam + 1))
-        S2[1:tam,1:tam] = S
-        S2[0,0] = 1
-        S2 = multiplicacionMatricial(H, S2)
+        A2 = B[1:, 1:]
+        S2, D2 = diagRH(A2, tol, K)
+
+        D = np.zeros_like(A)
+        D[0, 0] = lam
+        D[1:, 1:] = D2
+
+        S = np.eye(n)
+        S[1:, 1:] = S2
+        S = multiplicacionMatricial(H, S)
+
+    # Redondear errores numéricos pequeños
+    D[np.abs(D) < 1e-14] = 0
 
     return S, D
 
@@ -597,57 +657,378 @@ def multiplica_rala_vector(A,v):
     for (i, j), valor in dicc.items():
         w[i] += valor * v[j]
     return w
-"""
-def svd_reducida(A,k="max",tol=1e-15):
-    m = A.shape[0]
-    n = A.shape[1]
-    r = min(n,m)
+
+def svd_reducida(A, k="max", tol=1e-15):
+    m, n = A.shape
+    r = min(m, n)
+
+    # SVD reducida: A = U Σ Vᵗ
     if m >= n:
-        V, E = diagRH(multiplicacionMatricial(traspuesta(A), A))
-        print(E, V)
-        idx = np.argsort(E)[::-1]
-        print(idx)
-        #print(E ,V)
+        # Caso rectangular alto (más filas que columnas)
+        S, D = diagRH(multiplicacionMatricial(traspuesta(A), A))
+        V = S
         B = multiplicacionMatricial(A, V)
     else:
-        V, E = diagRH(multiplicacionMatricial(A, traspuesta(A)))
-        B = multiplicacionMatricial(traspuesta(A), V)
-    if B.ndim == 1:
-        B = B.reshape(-1, 1)
-    U = []
-    for j in range(r):
-        u = multiplicacionMatricial(A, V[:, j].reshape(-1, 1))
-        u /= norma(u, 2)
-        U.append(u.flatten())            # guardo como fila
-    U = np.column_stack(U)
-    return U, E, V
+        # Caso rectangular ancho
+        S, D = diagRH(multiplicacionMatricial(A, traspuesta(A)))
+        U = S
+        B = multiplicacionMatricial(traspuesta(A), U)
+
+    # Extraer los valores singulares (positivos)
+    sigmas = np.sqrt(np.abs(np.diag(D)))
+
+    # Filtrar según k o tolerancia
+    if k == "max":
+        k = r
+    mask = sigmas > tol
+    sigmas = sigmas[mask]
+    k = min(k, len(sigmas))
+
+    sigmas = sigmas[:k]
+
+    # Construcción de U
+    if m >= n:
+        U = np.zeros((m, k))
+        for j in range(k):
+            if sigmas[j] > tol:
+                u = B[:, j] / sigmas[j]
+                U[:, j] = u
+    else:
+        V = np.zeros((n, k))
+        for j in range(k):
+            if sigmas[j] > tol:
+                v = B[:, j] / sigmas[j]
+                V[:, j] = v
+
+    # Matriz diagonal Σ
+    Σ = np.zeros((k, k))
+    np.fill_diagonal(Σ, sigmas)
+    if m >= n:
+        return U, Σ, V
+    else:
+        return U, Σ, V
+"""
+# Chequeos internos
+    print(f"\n--- Test interno ({m},{n}) ---")
+    print("UᵀU ≈ I?\n", np.round(U.T @ U, 4))
+    print("VᵀV ≈ I?\n", np.round(V.T @ V, 4))
+    print("A ≈ U Σ Vᵀ ? error =", np.linalg.norm(A - U @ np.diag(sigmas) @ V.T))
+"""
+
+# ITEM 1 
+def cargarDataset(ruta_base):
+
+    def cargar_conjunto(archivo_zip, tipo):
+        X_list = []
+        Y_list = []
+
+        nombres = archivo_zip.namelist()
+
+        for nombre in nombres:
+            # Buscamos los archivos del conjunto correspondiente
+            if nombre.endswith(".npy") and ("/" + tipo + "/") in nombre:
+
+                archivo = archivo_zip.open(nombre)
+                datos = archivo.read()
+                archivo.close()
+
+                arr = np.load(io.BytesIO(datos))
+                arr = arr.reshape(-1, 1)
+                X_list.append(arr)
+
+                # Determinar etiqueta según el nombre
+                if "cats" in nombre:
+                    y = np.array([[1.0], [0.0]])
+                    Y_list.append(y)
+                elif "dogs" in nombre:
+                    y = np.array([[0.0], [1.0]])
+                    Y_list.append(y)
+
+        X = np.hstack(X_list)
+        Y = np.hstack(Y_list)
+        return X, Y
+
+    # Abrimos el zip principal
+    zip_externo = zipfile.ZipFile(ruta_base, "r")
+    nombres_externos = zip_externo.namelist()
+
+    # Buscamos el dataset.zip interno
+    dataset = None
+    for n in nombres_externos:
+        if n.endswith("dataset.zip"):
+            dataset = n
+
+    archivo_interno = zip_externo.open(dataset)
+    datos_zip_interno = archivo_interno.read()
+    archivo_interno.close()
+    zip_externo.close()
+
+    # Abrimos el zip interno
+    zip_interno = zipfile.ZipFile(io.BytesIO(datos_zip_interno), "r")
+
+    Xt, Yt = cargar_conjunto(zip_interno, "train")
+    Xv, Yv = cargar_conjunto(zip_interno, "val")
+
+    zip_interno.close()
+
+    return Xt, Yt, Xv, Yv
+
+
+# Ejemplo de uso
+Xt, Yt, Xv, Yv = cargarDataset("template-alumnos.zip")
+
+print("Xt:", Xt.shape)
+print("Yt:", Yt.shape)
+print("Xv:", Xv.shape)
+print("Yv:", Yv.shape)
+
+
+
     
-#print(svd_reducida(genera_matriz_para_test(3)))
-"""    
-A = np.random.random((5,5))
-print(diagRH(A))
 
-#------------------------Punto 5 ---------------------------------
 
-def esPseudoInverda(X, pX, tol=1e-8):
+
+# ITEM 2
+
+def pinvEcuacionesNormales(X, L, Y):
+    #A = Xt . X . Vamos a factorizarlo a A = L . Lt para aplicar cholesky. 
+    #IDEA PARA ESTE EJERCICIO : ASUMIMOS (ESPERO Q SEA ASI) QUE YO POR EJEMPLO RECIBO UNA X DE 3X2 ENTONCES LA L Q ME VIENE YA ES LA CHOLESKY DE (XT.X) EN ESTE CASO
+    #PARA EL PRIMER CASO : LA IDEA RESOLVER EL SISTEMA L.LT.U=XT (SIENDO U LA PSEUDOINV DE X) , ENTONCES LO Q HAGO ES "DIVIDIRLO EN 2 PARTES" , PRIMER TOMO LA MULTIPLICACION
+    #LT.U = B , (LO LLAMO B), PARA Q ME QUEDE L.B=XT ( ESTO ES PQ L Y LT SON MATRICES TRIANGULARES Y TENGO UNA FUNCION Q ME AYUDA CON ESTAS)
+    #ENTONCES RESUELVO L.B=XT , OBTENGO B (!ACLARACION!: CUANDO CREO B PARA SABER SUS DIMENSIONES COMO L.B=XT , B TIENE Q TENER LA CANT DE COLUMNAS DE L(=CANT FILAS DE LT)(COMO FILAS) Y LA CANT DE COLUMNAS DE XT (COMO COLUMNAS) )
+    #LUEGO CON B OBTENIDA , RESUELVO LT.U=B , PARA CREAR U NECESITO SABER LAS DIMENSIONES Q TENGO Q TENER 
+    # POR ENUNCIADO SABEMOS Q U = (XT.X) A LA MENOS . XT , ES DECIR SI SON IGUALES <-> TIENEN LAS MISMAS DIMENSIONES  SI XT ES DE PXN Y X=ES DE NXP --> (XT.X) ES DE PXP (SU INVERSA IGUAL )
+    # Y SI HAGO PXP POR (LAS DIMENSIONES DE XT(ES DECIR PXN))=ME QUEDA Q U ES DE PXN(MISMAS DIMS Q XT)
+   
+    XT=traspuesta(X)
+    dimsX=np.shape(X)
+    n = dimsX[0]
+    p = dimsX[1]
+    LT=traspuesta(L)
+    dimxt=np.shape(XT)
+    if n>p:
+    #CREACOPN DE LA MATRIZ B , DONDE B ES LT.U
+        p = XT.shape[0]
+        n = XT.shape[1]
+        B= np.zeros((p, n))
+        for j in range(n):
+            b = XT[:, j]
+            x_sol = res_tri(L, b, "inferior") # aca es donde por cada columna uso la func
+            for k in range(p):
+                B[k][j] = x_sol[k]# aca lo agrego a la matriz
+       # print(B)
+        #ACA ES LA CREACION DE U A PARTIR DE LT.U=B
+        filasU=dimxt[0]
+        columnasU=dimxt[1]
+        U = np.zeros((filasU , columnasU))
+        for j in range(columnasU):
+             b = B[:, j]
+             """
+             b = []
+             for i in range(filasU):
+                  b.append(B[i][j])
+             b = np.array(b)
+             """
+             x_sol = res_tri(LT, b, "superior")
+             for k in range(filasU):
+                U[k][j] = x_sol[k]
+        print(U)
+            
+    #luego como W=U.Y
     
-    X_pX = multiplicacionMatricial(X, pX)   # X.pX
-    pX_X = multiplicacionMatricial(pX, X)   # pX.X
-    XpX_X = multiplicacionMatricial(X_pX, X)  # (X.pX).X
-    pXX_pX = multiplicacionMatricial(pX_X, pX)  # (pX.X).pX
+        W=multiplicacionMatricial(Y, U) ###CHEQUEAR ESTO!!!!!!!
+    
+        return W
 
-    #1) Verificar primera condición:   X pX X = X
-    cond1 = np.allclose(XpX_X, X, atol=tol)
+    elif dimsX[0]<dimsX[1]:
 
-    #2) Verificar segunda condición:   pX X pX = pX
-    cond2 = np.allclose(pXX_pX, pX, atol=tol)
+        #V x (X.XT) = XT
+        #V x L.LT = XT
+        #traspong todo =
+        #L.LT.VT=X
+        #LT.VT=B2
+        #L.B2=X
+        #TENIENDO B2 --> LT.VT=B2 --> HALLARIAMOS VT , LUEGO TRASPONER VT  --> CONSEGUIS V
+        
+        #IDEA PARA ESTE IF : EN LA CREACION DE B2 ES DECIR DE LT.VT, VAMOS A PENSARLO COMO ANTES O SINO COMO SABEMOS LA DIM DE V ,TMB SABRIAMOS LA DE VT Y POR ENDE LA DE B2
+        #SI QUIERO Q L.B2 =X , ENTONCES FILASB2= COLUMNAS L(filas x) Y COLUMNAS B2 =COLUMNAS X ( EN ESTE CASO COLUMNAS X )(EN ESTE CASO L ES CHOLESKY DE X.XT , LUEGO DIM DE L ES nxn)
+       
+        B2= np.zeros((n, p))
+        filasB2= n
+        columnasB2=p
 
-    #3) Verificar tercera condición:    (X.pX)^T = X.pX   (simetría)
-    cond3 = np.allclose(traspuesta(X_pX), X_pX, atol=tol)
+        for j in range(columnasB2):
+            b=[]
+            for i in range(filasB2):
+                b.append(X[i][j])#CHEQUEAR CON LOS TESTTTT!!!!
+            b = np.array(b)
+            x_sol = res_tri(L, b, "inferior") # aca es donde por cada columna uso la func
+            for k in range(filasB2):
+                B2[k][j] = x_sol[k]
 
-    #4) Verificar cuarta condición:    (pX.X)^T = pX.X   (simetría)
-    cond4 = np.allclose(traspuesta(pX_X), pX_X, atol=tol)
+        #LT.VT=B
+        filasvt=n
+        columnasvt=p
+        VT=np.zeros((filasvt,columnasvt))
+     
+        for j in range (columnasvt):
+            b2=[]
+            for i in range(filasvt):
+                b2.append(B2[i][j])
+            b2=np.array(b2)
+            xsol2=res_tri(LT, b2, "superior")
+            for k in range(filasvt):
+                VT[k][j] = xsol2[k]###VER TEMA INDICES
 
-    # Si cumple todas las condiciones, es pseudo-inversa
-    return cond1 and cond2 and cond3 and cond4
+        V=traspuesta(VT)
+        W2=multiplicacionMatricial(Y,V)
+        return W2
+    else:
+        # pseudo(X) = inv(X)
+        #Tenemos que WX = Y. 
+        #Solo pasamos X al otro lado. Quedaria W = T.X^-1
+        inv_X = inversa(X)
+        return multiplicacionMatricial(Y, inv_X)
 
+# ITEM 3
+
+def pinvSVD(U, S, V, Y):
+    m, n = S.shape
+    
+    # Creo la matriz S+ (n x m)
+    S_plus = np.zeros((n, m))
+    
+    for i in range(min(m, n)):
+        if S[i, i] > 0:
+            S_plus[i, i] = 1 / S[i, i]
+    
+    # Calculo X+
+    X_plus = multiplicacionMatricial(multiplicacionMatricial(V, S_plus), traspuesta(U))
+    
+    # Calculo W
+    W = multiplicacionMatricial(X_plus, Y)
+    return W  
+
+# ITEM 4
+
+def pinvHouseHolder(Q,R,Y): 
+    #IDEAS: PLANTEEMOS LO Q NOS DICE EL ALGORITMO 3 , YO QUIERO HALLAR PRIMERO X+,LLAMEMOSLO "V",(ALL ESTO USANDO QUE (QR= XT))
+    #LUEGO V= Q.(RT)-1 
+    #AHORA MULTIPLICO AMBOS LADOS POR RT Y LLEGO A QUE V.RT=Q
+    #LUEGO TRASPONGO LA IGUALDAD PARA  Q ME QUEDE MAS COMODO Y PODER USAR LA FUNCION Q"RESOLVERTRIANGULAR)
+    #ME QUEDA QUE R.VT=QT
+    #FINALMENTE W=V.Y
+    #PARENTESIS R ES TRIANG SUP
+    #:)
+    #ACLARACION SOBRE CREACION DE MATRIZ VT , SOBRE SUS DIMENSIONES : VT TIENE Q TENER LA SIGUIENTE DIMENSION , R ES CUADRADA LUEGO R ES nxn Q ES RECTANGULAR)? DIRIA ASI 
+    #HAGAMOS Q ES DE pxn esto implicaria q QT es nxp y si yo estoy BUSCANDO LA DIMESION DE UNA MATRIZ TAL QUE VALGA R.VT=QT 
+    #nxn X ?? = nxp , SABEMOS Q LA CANT DE FILAS DE VT TIENE Q SER N PUES SINO NO VALDRIA LA MULTIPLICACION Y SI COMO RESULTANTE ME QUEDA UNA MATRIZ DE PXN 
+    #ENTONCES VT TIENE Q SER DE DIM NXP
+    #Y POR ESTO ME CREO LA MATRIZ VT CON LAS MISMAS DIM Q QT
+    
+    
+    QT = traspuesta(Q)
+    dimsQT=np.shape(QT)
+    n=dimsQT[0]
+    p=dimsQT[1]
+    VT = np.zeros((n, p))
+    
+    for j in range (p):
+        b=[]
+        for i in range(n):
+            b.append(QT[i][j])#ESTOS INDICEES VAN BIEN??
+        b=np.array(b)
+        soluc=res_tri(R,b,"superior")
+        
+        for k in range(n):
+            VT[k][j]=soluc[k]#MISMO PARA ACA , ESTOS INDICES TAN BIEN??
+            
+        
+    V=traspuesta(VT)
+    
+    W=multiplicacionMatricial(V,Y)
+    
+    return W
+    
+def pinvGramSchmidt(Q, R, Y):
+    
+    QT = traspuesta(Q)
+    dimsQT=np.shape(QT)
+    n=dimsQT[0]
+    p=dimsQT[1]
+    VT = np.zeros((n, p))
+    
+    for j in range (p):
+        b=[]
+        for i in range(n):
+            b.append(QT[i][j])
+        b=np.array(b)
+        soluc=res_tri(R,b,"superior")
+        
+        for k in range(n):
+            VT[k][j]=soluc[k]
+            
+        
+    V=traspuesta(VT)
+    
+    W=multiplicacionMatricial(V,Y)
+    
+    return W
+
+# ITEM 5
+
+def esPseudoInversa(X,Xp,tol=1e-8):
+    
+    XXp = multiplicacionMatricial(X, Xp)
+    XpX = multiplicacionMatricial(Xp, X)
+  
+    matrizprimeracond=multiplicacionMatricial(XXp,X)
+    matrizsegundacond=multiplicacionMatricial(XpX,Xp)
+    matrizterceracond=traspuesta(XXp)
+    matrizcuartacond=traspuesta(XpX)
+
+ 
+    
+    def tolerancia(y, z):
+        diferencia = np.abs(y - z)
+        maxerror = np.max(diferencia)
+        return maxerror < tol
+    
+    condicion1= tolerancia(matrizprimeracond,X)
+    condicion2=tolerancia(matrizsegundacond,Xp)
+    condicion3=tolerancia(matrizterceracond,XXp)
+    condicion4=tolerancia(matrizcuartacond,XpX)
+    
+    if condicion1 and condicion2 and condicion3 and condicion4 :
+        return True
+    else :
+        return False
+
+
+# Caso n > p
+
+X = np.array([
+    [1,  2,  3],
+    [0,  1,  4],
+    [2, -1,  0],
+    [1,  1,  1],
+    [3,  0,  2]
+], dtype=float)
+
+"""
+X=np.array([[1,2,3],
+           [2,5,7]
+          ] )
+"""
+Y = np.array([
+    [1, 0,2],
+    [0, 1,3],
+    [1, 1,4],
+    [2, 1,5],
+    [0, 2,6]
+], dtype=float)
+
+#L=cholesky(multiplicacionMatricial(X, traspuesta(X)))
+L = cholesky(multiplicacionMatricial(traspuesta(X), X))
+#print(L)
+print(pinvEcuacionesNormales(X, L, Y))
