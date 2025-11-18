@@ -627,3 +627,27 @@ def svd_reducida(A,k="max",tol=1e-15):
 A = np.random.random((5,5))
 print(diagRH(A))
 
+#------------------------Punto 5 ---------------------------------
+
+def esPseudoInverda(X, pX, tol=1e-8):
+    
+    X_pX = multiplicacionMatricial(X, pX)   # X.pX
+    pX_X = multiplicacionMatricial(pX, X)   # pX.X
+    XpX_X = multiplicacionMatricial(X_pX, X)  # (X.pX).X
+    pXX_pX = multiplicacionMatricial(pX_X, pX)  # (pX.X).pX
+
+    #1) Verificar primera condición:   X pX X = X
+    cond1 = np.allclose(XpX_X, X, atol=tol)
+
+    #2) Verificar segunda condición:   pX X pX = pX
+    cond2 = np.allclose(pXX_pX, pX, atol=tol)
+
+    #3) Verificar tercera condición:    (X.pX)^T = X.pX   (simetría)
+    cond3 = np.allclose(traspuesta(X_pX), X_pX, atol=tol)
+
+    #4) Verificar cuarta condición:    (pX.X)^T = pX.X   (simetría)
+    cond4 = np.allclose(traspuesta(pX_X), pX_X, atol=tol)
+
+    # Si cumple todas las condiciones, es pseudo-inversa
+    return cond1 and cond2 and cond3 and cond4
+
