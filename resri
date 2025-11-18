@@ -1,0 +1,20 @@
+def res_tri(L, b, inferior=True):
+    L = np.array(L, dtype=float)
+    b = np.array(b, dtype=float)
+    n = L.shape[0]
+    x = np.zeros(n, dtype=float)
+
+    if inferior:  # triangular inferior: forward substitution
+        for i in range(n):
+            h = 0.0
+            for j in range(i):
+                h += L[i, j] * x[j]
+            x[i] = (b[i] - h) / L[i, i]
+    else:         # triangular superior: back substitution
+        for i in range(n - 1, -1, -1):
+            h = 0.0
+            for j in range(i + 1, n):
+                h += L[i, j] * x[j]
+            x[i] = (b[i] - h) / L[i, i]
+
+    return x
