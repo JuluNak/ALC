@@ -1031,4 +1031,87 @@ Y = np.array([
 #L=cholesky(multiplicacionMatricial(X, traspuesta(X)))
 L = cholesky(multiplicacionMatricial(traspuesta(X), X))
 #print(L)
+
 print(pinvEcuacionesNormales(X, L, Y))
+
+
+#-----------------------------------Test del item 5---------------------------------------
+#Este caso deberia darme TRUE en mi funcion en general esPseudoInverda
+print("----------------------Casos TRUE de pseudo inversa----------------------")
+
+#Ejemplo sencillo de matriz no cuadrada
+X1 = np.array([
+    [1, 2],
+    [3, 4],
+    [5, 6]
+])
+
+print("¿Es X1 Pseudo-Inversa?: ", esPseudoInverda(X1, np.linalg.pinv(X1)))        #np.linalg.pinv(X) una funcion particular de numpy que calcula la pseudo inversa
+
+#Caso de matriz singular y cuadrada pero que deberia de darme TRUE tambien
+X2 = np.array([
+    [1, 2],
+    [2, 4]
+], dtype=float)
+print("¿Es X2 Pseudo-Inversa?: ", esPseudoInverda(X2, np.linalg.pinv(X2)))
+
+
+
+
+
+print("----------------------Casos FALSE de pseudo inversa----------------------")
+
+#Caso donde la pX3 la supuesta pseudo-inversa de la matriz X3 que no cumple la primera condicion (X pX X = X)
+X3 = np.array([
+    [1, 2],
+    [3, 4]
+], dtype=float)
+
+pX3 = np.array([
+    [0, 0],
+    [0, 0]
+], dtype=float) #Multiplicidad de Matriz nula siempre va ser nula
+
+print("¿Es X3 Pseudo-Inversa?: ", esPseudoInverda(X3, pX3))
+
+#Caso donde la segunda condicion (pX X pX = pX) no se cumple pero si las demas condiciones
+X4 = np.array([
+    [1, 0],
+    [0, 0]
+], dtype=float)
+
+pX4 = np.array([
+    [1, 0],
+    [0, 2]        # ese numero 2 hace que falle solo la segunda condicion
+], dtype=float)
+
+print("¿Es X4 Pseudo-Inversa?: ", esPseudoInverda(X4, pX4))
+
+#Vertificar que este bien la funcion traspuesta
+"""
+#Caso donde la tercera condicion ((X.pX)^T = X.pX) no se cumple pero si las demas condiciones
+X5 = np.array([
+    [1, 0],
+    [0, 0]
+], dtype=float)
+
+pX5 = np.array([
+    [1, 1],
+    [0, 0]
+], dtype=float)
+
+print("¿Es X5 Pseudo-Inversa?: ", esPseudoInverda(X5, pX5))
+
+#Caso donde la cuarta condicion ((pX.X)^T = pX.X) no se cumple pero si las demas condiciones
+X6 = np.array([
+    [2, 0],
+    [0, 0]
+], dtype=float)
+
+pX6 = np.array([
+    [0.5, 1],
+    [0, 0]
+], dtype=float)
+
+print("¿Es X6 Pseudo-Inversa?: ", esPseudoInverda(X6, pX6))
+"""
