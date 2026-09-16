@@ -1,0 +1,35 @@
+def norma(x, p):
+   # x = np.array(x, dtype=float)  # convierte cualquier entrada a array
+    if p == 'inf':
+        actual = 0
+        for i in x:
+            if abs(i) > actual:
+                actual = abs(i)
+        return actual
+    else:
+        res: float = 0
+        for i in x:
+            res = res + abs(i)**p
+        res = res**(1/p)
+        return res
+
+def QR_con_GS(A,tol=1e-12,retorna_nops=False):
+    m = A.shape[0]
+    n = A.shape[1]
+    cant_ops = 0
+    Q = np.zeros((m,n))
+    R = np.zeros((n,n))
+    Qm = np.zeros((m,n))
+c/
+    Q[:,0] = A[:,0]/norma(A[:,0], 2)
+    R[0,0] = norma(A[:,0], 2)
+
+    for j in range(1,n):
+        Qm[:,j] = A[:,j]
+        for k in range(0,j):
+            R[j,k] = np.inner(Q[k],Qm[j])
+            Qm[:,j] = Qm[:,j] - R[j,k]*Q[:,k]
+        R[j,j] = norma(Qm[j],2)
+        Q[:,j] = Qm[:,j]/R[j,j]
+    print(Q,R)
+    return Q, R
